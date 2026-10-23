@@ -49,6 +49,12 @@ TAG=20261022-abc1234 ~/robot_up.sh    # roll back to an older build (docker imag
   `ubuntu:focal` + rospy/tf2 runtime came out the same size (2.11 GB, tested 2026-10-22). What keeps safety small is
   what it doesn't contain: no CUDA, TensorRT, torch or GPU runtime. On disk, its base layers are shared with
   scout-base (`ros-base` is built on `ros-core`), so it adds about 29 MB.
+- **A watchdog in the entrypoint, because Docker never restarts an unhealthy container.** Docker only *reports*
+  health, and roslaunch keeps running when a non-required node dies: a killed detector left the camera running and
+  the container unhealthy indefinitely (tested 2026-10-23). With `HEARTBEAT_FILE` set (safety, perception, base),
+  the entrypoint stops roslaunch once the heartbeat is older than `HEARTBEAT_MAX_AGE` (10 s), after a start-up
+  grace period (`HEARTBEAT_GRACE`: 30 / 180 / 90 s). The container then exits and is restarted. This covers hangs
+  as well as crashes. The base heartbeat requires `/odom`, `/livox/lidar` and DLIO's odometry.
 - **`restart: unless-stopped`, not `on-failure`.** When a `required` node dies, roslaunch shuts down and exits
   with code **0**: a killed `safety_node.py` left its container exited, never restarted (tested 2026-10-23). Docker
   backs off between restarts, and `docker compose stop` / `docker kill` count as manual stops and aren't restarted.
@@ -63,7 +69,7 @@ TAG=20261022-abc1234 ~/robot_up.sh    # roll back to an older build (docker imag
 
 | what dies | what happens | verified |
 |---|---|---|
-| perception | safety: detections stale > 0.3 s → FAULT → all motion zero. On restart the detector re-registers with the surviving master and safety recovers after 1 s healthy | to test |
+| perception | safety: detections stale > 0.3 s → FAULT → all motion zero. The entrypoint watchdog sees the heartbeat stale (10 s) and restarts the container; the detector re-registers with the surviving master and safety recovers | **yes, 2026-10-23, wheels not involved:** FAULT after 0.304 s, container restarted, safety re-subscribed, OK again after 29.7 s, 30 FPS |
 | base | nothing sends CAN commands → wheels stop **only if the Scout firmware has a command timeout** | **blocked on the firmware test** |
 | safety | nothing publishes `/cmd_vel`. `scout_base` sends one CAN command per message and doesn't repeat it, so the wheels stop **only via the firmware timeout** | **blocked on the firmware test** |
 | master | existing connections keep working; nothing can (re)start → `robot_down.sh` + `robot_up.sh` | to test |

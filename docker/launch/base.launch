@@ -31,5 +31,6 @@
   </include>
 
   <!-- container health signal: file age read by docker/common/healthcheck.sh -->
-  <node pkg="scout_nav" type="heartbeat_relay.py" name="base_heartbeat" args="--file /run/scout/base.alive"/>
+  <node pkg="scout_nav" type="heartbeat_relay.py" name="base_heartbeat"
+        args="--file /run/scout/base.alive /odom /livox/lidar /dlio/odom_node/odom"/>
 </launch>

@@ -47,6 +47,11 @@ services:
       dockerfile: docker/safety/Dockerfile
     restart: unless-stopped         # roslaunch exits 0 when a required node dies, so on-failure would never restart
     stop_grace_period: 30s
+    environment:
+      <<: *ros-env
+      HEARTBEAT_FILE: /run/scout/safety.alive   # entrypoint watchdog: stale heartbeat -> exit -> restart
+      HEARTBEAT_GRACE: "30"
+      HEARTBEAT_MAX_AGE: "10"
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - scout_run:/run/scout
@@ -74,6 +79,9 @@ services:
     environment:
       <<: *ros-env
       BAG_ROOT: /home/agile/bags
+      HEARTBEAT_FILE: /run/scout/base.alive     # /odom (CAN), /livox/lidar and DLIO odometry all fresh
+      HEARTBEAT_GRACE: "90"
+      HEARTBEAT_MAX_AGE: "10"
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - scout_run:/run/scout
@@ -106,6 +114,11 @@ services:
       - "c 189:* rmw"
       - "c 81:* rmw"
     group_add: ["video"]
+    environment:
+      <<: *ros-env
+      HEARTBEAT_FILE: /run/scout/perception.alive   # detections published; covers detector and camera death/hang
+      HEARTBEAT_GRACE: "180"                        # engines + camera take ~130 s to come up
+      HEARTBEAT_MAX_AGE: "10"
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - scout_run:/run/scout
