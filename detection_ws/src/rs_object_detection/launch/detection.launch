@@ -1,0 +1,72 @@
+<launch>
+  <!-- Detector node runs under the dedicated venv (CUDA torch + ultralytics). -->
+  <arg name="venv_python"    default="$(env HOME)/projects/rs_detection/.venv/bin/python"/>
+  <arg name="model"          default="$(find rs_object_detection)/models/yolo11s.engine"/>
+  <arg name="conf"           default="0.4"/>
+  <!-- Inference backend: ultralytics (YOLO .engine + ByteTrack) or deepstream (nvinfer + NvSORT, ~5 % CPU) -->
+  <arg name="backend"        default="ultralytics"/>
+  <arg name="ds_infer_cfg"   default="$(find rs_object_detection)/config/deepstream/config_infer_yolo11s.txt"/>
+  <arg name="ds_tracker_cfg" default="$(find rs_object_detection)/config/deepstream/tracker_NvSORT.yml"/>
+  <arg name="ds"             value="$(eval backend == 'deepstream')"/>
+  <arg name="camera_ns"      default="/camera/camera"/>
+  <!-- true: register raw depth into the color frame on the GPU (run the camera with align_depth:=false).
+       false: use the driver's aligned_depth_to_color topic (camera with align_depth:=true; much slower). -->
+  <arg name="register_depth" default="true"/>
+  <!-- ByteTrack tracking: stable ids + 3D velocity on ~tracks. Settings in config/tracker.yaml. -->
+  <arg name="tracking"       default="true"/>
+  <arg name="tracker_cfg"    default="$(find rs_object_detection)/config/tracker.yaml"/>
+  <!-- Re-identification: people keep their id after leaving the view (needs tracking). Empty disables. -->
+  <arg name="reid_model"     default="$(find rs_object_detection)/models/yolo26n-reid.engine"/>
+  <!-- Frames for ~tracks: positions in output_frame, velocity measured in velocity_frame (empty = camera frame).
+       On the robot: output_frame:=base_link velocity_frame:=odom -->
+  <arg name="output_frame"   default=""/>
+  <arg name="velocity_frame" default=""/>
+  <!-- Republish the GPU-registered depth as <camera_ns>/aligned_depth_to_color (for nav stacks that want it;
+       the camera must then run with align_depth:=false, or there are two publishers) -->
+  <arg name="publish_aligned_depth" default="false"/>
+  <arg name="launch_camera"  default="false"/>
+  <arg name="rviz"           default="false"/>
+  <!-- Foxglove websocket bridge for viewing from another machine: ws://<orin-ip>:<foxglove_port> -->
+  <arg name="foxglove"       default="false"/>
+  <arg name="foxglove_port"  default="8765"/>
+
+  <!-- Optionally start the RealSense driver; alignment is only needed when not registering in-node. -->
+  <include if="$(arg launch_camera)" file="$(find realsense2_camera)/launch/rs_camera.launch">
+    <arg name="camera"      value="camera/camera"/>
+    <arg name="align_depth" value="$(eval not register_depth)"/>
+    <arg name="tf_prefix"   value="camera"/>
+  </include>
+
+  <node pkg="rs_object_detection" type="detector_node.py" name="rs_detector" output="screen"
+        launch-prefix="$(arg venv_python)">
+    <env name="PYTHONUNBUFFERED" value="1"/>
+    <!-- DeepStream's tracker lib fails to load after torch without this ("static TLS block") -->
+    <env if="$(arg ds)" name="LD_PRELOAD" value="/lib/aarch64-linux-gnu/libgomp.so.1"/>
+    <rosparam command="load" file="$(find rs_object_detection)/config/detector.yaml"/>
+    <param name="model"          value="$(arg model)"/>
+    <param name="conf"           value="$(arg conf)"/>
+    <param name="register_depth" value="$(arg register_depth)"/>
+    <param name="backend"        value="$(arg backend)"/>
+    <param name="ds_infer_config" value="$(arg ds_infer_cfg)"/>
+    <param if="$(eval tracking and not ds)" name="tracker" value="$(arg tracker_cfg)"/>
+    <param if="$(eval tracking and ds)"     name="tracker" value="$(arg ds_tracker_cfg)"/>
+    <param unless="$(arg tracking)" name="tracker" value=""/>
+    <param name="reid_model" value="$(arg reid_model)"/>
+    <param name="publish_aligned_depth" value="$(arg publish_aligned_depth)"/>
+    <param name="aligned_depth_topic"   value="$(arg camera_ns)/aligned_depth_to_color"/>
+    <param name="output_frame"   value="$(arg output_frame)"/>
+    <param name="velocity_frame" value="$(arg velocity_frame)"/>
+    <param name="color_topic"    value="$(arg camera_ns)/color/image_raw"/>
+    <param name="info_topic"     value="$(arg camera_ns)/color/camera_info"/>
+    <param if="$(arg register_depth)"     name="depth_topic" value="$(arg camera_ns)/depth/image_rect_raw"/>
+    <param if="$(arg register_depth)"     name="depth_info_topic" value="$(arg camera_ns)/depth/camera_info"/>
+    <param unless="$(arg register_depth)" name="depth_topic" value="$(arg camera_ns)/aligned_depth_to_color/image_raw"/>
+  </node>
+
+  <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz"
+        args="-d $(find rs_object_detection)/rviz/detection.rviz"/>
+
+  <include if="$(arg foxglove)" file="$(find foxglove_bridge)/launch/foxglove_bridge.launch">
+    <arg name="port" value="$(arg foxglove_port)"/>
+  </include>
+</launch>

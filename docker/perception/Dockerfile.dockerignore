@@ -1,0 +1,11 @@
+*
+!docker/third_party.repos
+!docker/patches
+!docker/common
+!docker/launch
+!docker/perception/requirements.txt
+!detection_ws/src/rs_object_detection
+detection_ws/src/rs_object_detection/models/*.pt
+detection_ws/src/rs_object_detection/models/yolo11n*
+detection_ws/src/rs_object_detection/*.png
+**/__pycache__

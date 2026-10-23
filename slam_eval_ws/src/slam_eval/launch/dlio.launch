@@ -1,0 +1,14 @@
+<launch>
+  <!-- DLIO as on the robot (robot.launch): odom + map node, the cfg in dlio_ws; only the console view is off. -->
+  <arg name="out" default="/tmp"/>
+  <include file="$(find slam_eval)/launch/common.launch"/>
+  <include file="$(find direct_lidar_inertial_odometry)/launch/dlio.launch">
+    <arg name="pointcloud_topic" value="/livox/lidar"/>
+    <arg name="imu_topic"        value="/livox/imu"/>
+    <arg name="robot_namespace"  value="/"/>
+  </include>
+  <param name="/dlio_odom/dlio/verbose" value="false"/>
+  <!-- params.yaml has waitUntilMove: true, which holds back the per-scan deskewed cloud (the latency probe's
+       output) until the robot has moved; odometry is unaffected. -->
+  <param name="/dlio_odom/dlio/map/waitUntilMove" value="false"/>
+</launch>

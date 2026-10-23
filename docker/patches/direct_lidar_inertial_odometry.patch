@@ -1,0 +1,29 @@
+diff --git a/cfg/dlio.yaml b/cfg/dlio.yaml
+index 9cebbe2..75e9fde 100644
+--- a/cfg/dlio.yaml
++++ b/cfg/dlio.yaml
+@@ -33,7 +33,7 @@ dlio:
+ 
+   extrinsics:
+     baselink2imu:
+-      t: [ 0.006253, -0.011775, 0.007645 ]
++      t: [ -0.042382, -0.019593,   0.020312]
+       R: [ 1.,  0.,  0.,
+            0.,  1.,  0.,
+            0.,  0.,  1. ]
+diff --git a/src/dlio/odom.cc b/src/dlio/odom.cc
+index bceae37..f4066f4 100644
+--- a/src/dlio/odom.cc
++++ b/src/dlio/odom.cc
+@@ -1396,9 +1396,8 @@ sensor_msgs::Imu::Ptr dlio::OdomNode::transformImu(const sensor_msgs::Imu::Const
+   static Eigen::Vector3f ang_vel_cg_prev = ang_vel_cg;
+ 
+   // Transform linear acceleration (need to account for component due to translational difference)
+-  Eigen::Vector3f lin_accel(imu_raw->linear_acceleration.x,
+-                            imu_raw->linear_acceleration.y,
+-                            imu_raw->linear_acceleration.z);
++  Eigen::Vector3f lin_accel(imu_raw->linear_acceleration.x * this->gravity_, imu_raw->linear_acceleration.y * this->gravity_, imu_raw->linear_acceleration.z*(this->gravity_));
++
+ 
+   Eigen::Vector3f lin_accel_cg = this->extrinsics.baselink2imu.R * lin_accel;
+ 

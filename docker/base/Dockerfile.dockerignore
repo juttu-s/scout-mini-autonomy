@@ -1,0 +1,7 @@
+*
+!docker/third_party.repos
+!docker/patches
+!docker/common
+!docker/launch
+!nav_ws/src/scout_nav
+**/__pycache__

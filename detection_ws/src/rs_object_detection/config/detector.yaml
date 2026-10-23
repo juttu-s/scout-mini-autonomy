@@ -1,0 +1,37 @@
+# Model path (.pt or TensorRT .engine) and register_depth are set from launch args in detection.launch.
+conf: 0.4              # used when tracking is off; with tracking, config/tracker.yaml thresholds apply
+iou: 0.5
+imgsz: 640
+half: true
+device: 0
+classes: []            # COCO class ids to keep, e.g. [0, 39, 56]; empty = all 80
+
+# Depth -> 3D (depth is registered into the color frame on the GPU unless register_depth is false)
+depth_scale: 0.001     # D455 16UC1 depth is in millimeters
+min_depth: 0.2
+max_depth: 8.0
+roi_fraction: 0.5      # use central 50% of each box for the median depth
+min_valid_pixels: 10
+
+depth_max_age: 0.25     # s; max color/depth timestamp gap for 3D, else 2D only
+publish_annotated: true
+jpeg_quality: 75        # ~image_annotated/compressed (drawn and encoded only while subscribed)
+marker_lifetime: 0.3
+log_every: 60
+
+# Tracking (enabled with the launch arg tracking:=true; the tracker yaml path is set there)
+track_history: 30      # frames of trail drawn on the annotated image
+velocity_window: 0.5    # s; velocity = least-squares slope of the 3D positions in this window
+velocity_min_samples: 5
+velocity_outlier: 0.25  # m; positions this far from a robust line fit are ignored (depth flips)
+track_timeout: 3.0     # s; node-side state of a vanished track is freed after this
+
+# Re-identification (model path set by the launch arg reid_model; needs tracking)
+reid_classes: [0]       # classes re-identified by appearance; the model is a person ReID model. [] = all
+reid_threshold: 0.6     # min cosine similarity to reuse an old id (same person ~0.93, different people <0.4 in tests)
+reid_memory: 300.0      # s an identity is remembered after it was last seen
+reid_gallery: 20        # embeddings kept per identity
+reid_update_period: 0.5 # s between gallery updates of a visible identity
+reid_pending_tries: 5   # good crops a new track is compared on before it is accepted as a new identity
+reid_pending_time: 2.0  # s; ... or this long (e.g. when only overlapping crops are seen), whichever comes first
+reid_border: 8          # px; crops touching the left/right image edge (cut off while panning) are not used

@@ -1,0 +1,11 @@
+# whitelist: only what safety/Dockerfile copies
+*
+!docker/third_party.repos
+!docker/patches
+!docker/common
+!docker/launch
+!detection_ws/src/rs_object_detection/package.xml
+!detection_ws/src/rs_object_detection/CMakeLists.txt
+!detection_ws/src/rs_object_detection/msg
+!detection_ws/src/scout_safety
+**/__pycache__

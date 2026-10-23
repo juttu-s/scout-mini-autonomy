@@ -1,0 +1,35 @@
+<launch>
+  <!-- scout-base container: the robot.launch parts that are drivers / odometry (Scout over CAN, MID360, DLIO),
+       Foxglove, and with nav:=true map:=<name> the navigation.launch parts (localization, map, move_base).
+       Same includes and defaults as robot.launch / navigation.launch, so behaviour is unchanged.
+       Camera, detector and safety run in their own containers. -->
+  <arg name="nav"      default="false"/>
+  <arg name="map"      default=""/>
+  <arg name="foxglove" default="true"/>
+  <arg name="init_x"   default="0.0"/>
+  <arg name="init_y"   default="0.0"/>
+  <arg name="init_yaw" default="0.0"/>
+
+  <include file="$(find scout_bringup)/launch/scout_robot_base.launch"/>
+  <include file="$(find livox_ros_driver2)/launch_ROS1/msg_MID360.launch"/>
+  <include file="$(find direct_lidar_inertial_odometry)/launch/dlio.launch">
+    <arg name="pointcloud_topic" value="/livox/lidar"/>
+    <arg name="imu_topic"        value="/livox/imu"/>
+    <arg name="robot_namespace"  value="/"/>
+  </include>
+
+  <include if="$(arg foxglove)" file="$(find foxglove_bridge)/launch/foxglove_bridge.launch">
+    <arg name="port" value="8765"/>
+  </include>
+
+  <include if="$(arg nav)" file="$(find scout_nav)/launch/navigation.launch">
+    <arg name="map"        value="$(arg map)"/>
+    <arg name="with_robot" value="false"/>
+    <arg name="init_x"     value="$(arg init_x)"/>
+    <arg name="init_y"     value="$(arg init_y)"/>
+    <arg name="init_yaw"   value="$(arg init_yaw)"/>
+  </include>
+
+  <!-- container health signal: file age read by docker/common/healthcheck.sh -->
+  <node pkg="scout_nav" type="heartbeat_relay.py" name="base_heartbeat" args="--file /run/scout/base.alive"/>
+</launch>

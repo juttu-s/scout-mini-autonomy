@@ -1,0 +1,13 @@
+# hdl_global_localization (BBS) for the Scout: overrides on top of the package defaults.
+# Map and scan share z = 0 at the MID360 (DLIO map frame / base_link). Match a horizontal slice 0.4-1.0 m above the
+# lidar (1.2-1.8 m above the floor): walls, partitions, tall furniture; above most chairs and people.
+bbs/map_min_z: 0.4
+bbs/map_max_z: 1.0
+bbs/scan_min_z: 0.4
+bbs/scan_max_z: 1.0
+bbs/max_range: 15.0
+bbs/min_tx: -25.0
+bbs/max_tx: 25.0
+bbs/min_ty: -25.0
+bbs/max_ty: 40.0
+bbs/map_resolution: 0.5

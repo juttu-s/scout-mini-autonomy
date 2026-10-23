@@ -1,0 +1,63 @@
+<launch>
+  <!-- 3D localization in a saved DLIO map with hdl_localization (NDT).
+       Predicts motion from DLIO's odom -> base_link and publishes map -> odom.
+       Start the robot where mapping started (map origin), or set the pose in Foxglove/RViz (/initialpose). -->
+  <arg name="map_dir"/>
+  <arg name="points_topic" default="/livox/lidar"/>
+  <arg name="init_x"   default="0.0"/>
+  <arg name="init_y"   default="0.0"/>
+  <arg name="init_yaw" default="0.0"/>  <!-- rad; converted to a quaternion below -->
+  <!-- Global relocalization (rosservice call /relocalize): finds the pose anywhere in the map (BBS search) -->
+  <arg name="global_localization" default="true"/>
+
+  <group if="$(arg global_localization)">
+    <include file="$(find hdl_global_localization)/launch/hdl_global_localization.launch"/>
+    <rosparam command="load" file="$(find scout_nav)/config/global_localization.yaml" ns="/hdl_global_localization"/>
+  </group>
+
+  <node pkg="nodelet" type="nodelet" name="localization_manager" args="manager" output="screen">
+    <!-- NDT_OMP used every core (415 % CPU, ~0.45 s per scan) competing with DLIO/detector; 4 threads is enough -->
+    <env name="OMP_NUM_THREADS" value="4"/>
+  </node>
+
+  <node pkg="nodelet" type="nodelet" name="globalmap_server_nodelet"
+        args="load hdl_localization/GlobalmapServerNodelet localization_manager">
+    <param name="globalmap_pcd" value="$(arg map_dir)/dlio_map.pcd"/>
+    <param name="convert_utm_to_local" value="false"/>
+    <param name="downsample_resolution" value="0.1"/>
+  </node>
+
+  <node pkg="nodelet" type="nodelet" name="hdl_localization_nodelet"
+        args="load hdl_localization/HdlLocalizationNodelet localization_manager" output="screen">
+    <remap from="/velodyne_points" to="$(arg points_topic)"/>
+    <!-- hdl_localization publishes on /odom by default, which is the Scout's wheel odometry topic -->
+    <remap from="/odom" to="/localization/odom"/>
+    <remap from="/status" to="/localization/status"/>
+    <remap from="/aligned_points" to="/localization/aligned_points"/>
+    <param name="odom_child_frame_id" value="base_link"/>
+    <param name="use_imu" value="false"/>                       <!-- DLIO odometry does the prediction -->
+    <param name="enable_robot_odometry_prediction" value="true"/>
+    <param name="robot_odom_frame_id" value="odom"/>
+    <!-- map -> odom is stamped with the scan time (0.3-0.5 s old when published); post-date it so move_base can
+         transform plans at the current time (local patch in hdl_localization, like AMCL's transform_tolerance) -->
+    <param name="tf_future_offset" value="0.7"/>
+    <!-- process only the newest scan (local patch): with the upstream queue of 5 the pose fell ~0.7 s behind while
+         driving (DWA "extrapolation into the future" on map_floor <- odom_floor, lab2 goal aborted 2026-10-18) -->
+    <param name="points_queue_size" value="1"/>
+    <param name="cool_time_duration" value="2.0"/>
+    <param name="reg_method" value="NDT_OMP"/>
+    <param name="ndt_neighbor_search_method" value="DIRECT7"/>
+    <param name="ndt_neighbor_search_radius" value="2.0"/>
+    <param name="ndt_resolution" value="1.0"/>
+    <param name="downsample_resolution" value="0.25"/>  <!-- scan voxel size; 0.1 cost ~0.45 s per scan on the Orin -->
+    <param name="specify_init_pose" value="true"/>
+    <param name="init_pos_x" value="$(arg init_x)"/>
+    <param name="init_pos_y" value="$(arg init_y)"/>
+    <param name="init_pos_z" value="0.0"/>
+    <param name="init_ori_w" value="$(eval cos(float(arg('init_yaw')) / 2))"/>
+    <param name="init_ori_x" value="0.0"/>
+    <param name="init_ori_y" value="0.0"/>
+    <param name="init_ori_z" value="$(eval sin(float(arg('init_yaw')) / 2))"/>
+    <param name="use_global_localization" value="$(arg global_localization)"/>
+  </node>
+</launch>

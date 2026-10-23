@@ -1,0 +1,44 @@
+# Shared by global and local costmaps. base_link is DLIO's base_link = the MID360 lidar.
+# Footprint: Scout Mini 0.612 x 0.580 m, assuming the lidar sits over the robot's centre. MEASURE and adjust.
+footprint: [[0.31, 0.29], [0.31, -0.29], [-0.31, -0.29], [-0.31, 0.29]]
+footprint_padding: 0.02
+robot_base_frame: base_link
+transform_tolerance: 1.0   # map -> odom from hdl_localization is stamped with the scan time: 0.3-0.5 s old
+
+obstacle_layer:
+  # 3D voxel layer from the live MID360 cloud. Height limits (floor-relative) come from the map's
+  # costmap_heights.yaml (written by pcd_to_grid.py), loaded after this file.
+  enabled: true
+  track_unknown_space: true
+  combination_method: 1
+  publish_voxel_map: false
+  mark_threshold: 1          # voxels in a column needed to mark the cell
+  unknown_threshold: 15
+  observation_sources: lidar camera
+  lidar:
+    topic: /livox/lidar_filtered   # zero returns and self-hits removed (navigation.launch)
+    data_type: PointCloud2
+    sensor_frame: livox_frame
+    marking: true
+    clearing: true
+    expected_update_rate: 0.5
+    obstacle_range: 5.0
+    raytrace_range: 8.0
+    inf_is_valid: false
+  camera:
+    # D455 registered depth from the detector (decimated cloud): sees low obstacles close to the robot that the
+    # MID360 (7 deg down from 0.76 m) cannot. Front only (~87 deg), short range where its depth is accurate.
+    topic: /rs_detector/depth_points
+    data_type: PointCloud2
+    sensor_frame: camera_color_optical_frame
+    marking: true
+    clearing: true
+    expected_update_rate: 0.5
+    obstacle_range: 3.0
+    raytrace_range: 3.5
+    inf_is_valid: false
+
+inflation_layer:
+  enabled: true
+  inflation_radius: 0.4
+  cost_scaling_factor: 5.0

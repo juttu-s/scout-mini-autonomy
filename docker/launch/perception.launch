@@ -1,0 +1,46 @@
+<launch>
+  <!-- scout-perception container: the robot.launch parts that need the camera and the GPU: RealSense driver,
+       base_link -> camera_link mount, detector (DeepStream backend by default). Same args and defaults as
+       robot.launch; keep the camera mount below in step with it. The venv's packages are installed system-wide
+       in the image, so the detector runs under /usr/bin/python3. -->
+  <arg name="cam_x"     default="0.30"/>    <!-- PLACEHOLDER: measure camera centre ahead of the MID360 centre -->
+  <arg name="cam_y"     default="0.0"/>
+  <arg name="cam_z"     default="-0.225"/>
+  <arg name="cam_yaw"   default="0.0"/>
+  <arg name="cam_pitch" default="-0.0199"/>
+  <arg name="cam_roll"  default="0.0023"/>
+  <arg name="backend"   default="deepstream"/>
+  <arg name="initial_reset" default="false"/>
+  <arg name="camera_imu"    default="false"/>
+
+  <include file="$(find realsense2_camera)/launch/rs_camera.launch">
+    <arg name="camera"        value="camera/camera"/>
+    <arg name="tf_prefix"     value="camera"/>
+    <arg name="initial_reset" value="$(arg initial_reset)"/>
+    <arg name="align_depth"   value="false"/>
+    <arg name="color_width"   value="848"/>
+    <arg name="color_height"  value="480"/>
+    <arg name="depth_width"   value="848"/>
+    <arg name="depth_height"  value="480"/>
+    <arg name="color_fps"     value="30"/>
+    <arg name="depth_fps"     value="30"/>
+    <arg name="enable_gyro"   value="$(arg camera_imu)"/>
+    <arg name="enable_accel"  value="$(arg camera_imu)"/>
+    <arg name="gyro_fps"      value="200"/>
+    <arg name="accel_fps"     value="100"/>
+    <arg name="unite_imu_method" value="$(eval 'linear_interpolation' if camera_imu else '')"/>
+  </include>
+
+  <node pkg="tf2_ros" type="static_transform_publisher" name="base_to_camera"
+        args="$(arg cam_x) $(arg cam_y) $(arg cam_z) $(arg cam_yaw) $(arg cam_pitch) $(arg cam_roll) base_link camera_link"/>
+
+  <include file="$(find rs_object_detection)/launch/detection.launch">
+    <arg name="venv_python"    value="/usr/bin/python3"/>
+    <arg name="output_frame"   value="base_link"/>
+    <arg name="velocity_frame" value="odom"/>
+    <arg name="foxglove"       value="false"/>   <!-- Foxglove runs in scout-base -->
+    <arg name="backend"        value="$(arg backend)"/>
+    <arg name="publish_aligned_depth" value="true"/>
+  </include>
+  <param name="/rs_detector/heartbeat_file" value="/run/scout/perception.alive"/>
+</launch>

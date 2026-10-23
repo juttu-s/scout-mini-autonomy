@@ -1,0 +1,23 @@
+global_costmap:
+  global_frame: map_floor    # map, shifted down to the floor (navigation.launch)
+  update_frequency: 2.0
+  publish_frequency: 1.0
+  static_map: true
+  rolling_window: false
+  # Static map + live 3D obstacles + inflation, replanned at planner_frequency so a blocked aisle gets a detour.
+  # History (lab2, 2026-10-18): the obstacle layer was removed once because scans stamped while localization was wrong
+  # stayed as ghost walls; without it, a chair/person not in the map blocked the static path, DWA refused and nothing
+  # replanned ("Failed to find a valid control"). Ghosts are now prevented (start pose set, newest-scan localization)
+  # and the clear-costmap recoveries remove any that appear.
+  plugins:
+    - {name: static_layer,   type: "costmap_2d::StaticLayer"}
+    - {name: obstacle_layer, type: "costmap_2d::VoxelLayer"}
+    - {name: inflation_layer, type: "costmap_2d::InflationLayer"}
+  static_layer:
+    map_topic: /map
+    track_unknown_space: true   # unknown stays unknown; the planner may still cross it (allow_unknown)
+    subscribe_to_updates: false
+  # wide, gentle inflation so global paths run down the middle of aisles (0.6 / 5.0 hugged the desks)
+  inflation_layer:
+    inflation_radius: 0.4
+    cost_scaling_factor: 2.5

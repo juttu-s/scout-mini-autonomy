@@ -1,0 +1,5 @@
+<launch>
+  <!-- Shared by every method: the MID360 cloud is in livox_frame; base_link is the MID360 (as on the robot,
+       navigation.launch). The bag's /tf_static has base_link -> camera chain. -->
+  <node pkg="tf2_ros" type="static_transform_publisher" name="base_to_livox" args="0 0 0 0 0 0 base_link livox_frame"/>
+</launch>

@@ -1,0 +1,30 @@
+# Whitelist: only this project's own code is versioned here. Third-party packages are pinned in
+# docker/third_party.repos (commit + local patches in docker/patches/), built artifacts never.
+/*
+!/.gitignore
+!/setup.bash
+!/setup.md
+!/docker/
+!/detection_ws/
+/detection_ws/*
+!/detection_ws/src/
+/detection_ws/src/*
+!/detection_ws/src/rs_object_detection/
+!/detection_ws/src/scout_safety/
+!/nav_ws/
+/nav_ws/*
+!/nav_ws/src/
+/nav_ws/src/*
+!/nav_ws/src/scout_nav/
+!/slam_eval_ws/
+/slam_eval_ws/*
+!/slam_eval_ws/src/
+/slam_eval_ws/src/*
+!/slam_eval_ws/src/slam_eval/
+# never
+__pycache__/
+*.pyc
+/detection_ws/src/rs_object_detection/models/*.engine
+/detection_ws/src/rs_object_detection/models/*.pt
+/detection_ws/src/rs_object_detection/models/*.onnx
+/detection_ws/src/rs_object_detection/models/*.so

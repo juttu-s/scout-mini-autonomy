@@ -1,0 +1,68 @@
+base_global_planner: global_planner/GlobalPlanner
+base_local_planner: dwa_local_planner/DWAPlannerROS
+controller_frequency: 10.0
+planner_frequency: 1.0   # replan around live obstacles (0 = plan once: a blocked static path was never re-routed)
+planner_patience: 5.0
+controller_patience: 10.0
+oscillation_timeout: 15.0
+oscillation_distance: 0.2
+shutdown_costmaps: false
+recovery_behavior_enabled: true
+clearing_rotation_allowed: false
+# No rotate recovery: spinning in place blind next to people/desks is the wrong move for this robot (and with the
+# rectangular footprint near desks it either spun 360 deg or failed with "potential collision"). Clear and replan only.
+recovery_behaviors:
+  - {name: conservative_reset, type: clear_costmap_recovery/ClearCostmapRecovery}
+  - {name: aggressive_reset,   type: clear_costmap_recovery/ClearCostmapRecovery}
+conservative_reset: {reset_distance: 3.0, layer_names: [obstacle_layer]}
+aggressive_reset:   {reset_distance: 1.0, layer_names: [obstacle_layer]}
+
+GlobalPlanner:
+  allow_unknown: true
+  use_dijkstra: true
+  use_quadratic: true
+  use_grid_path: true   # gradient path extraction failed: "Failed to get a plan from potential when a legal potential was found" (lab2 2026-10-18)
+  default_tolerance: 0.2
+
+DWAPlannerROS:
+  # Skid-steer Scout Mini: no sideways motion. Forward only (the camera only sees forward), slow for trials.
+  max_vel_x: 0.4
+  min_vel_x: 0.0
+  max_vel_y: 0.0
+  min_vel_y: 0.0
+  max_vel_trans: 0.4
+  min_vel_trans: 0.05
+  # Turning: slow and gentle. At 0.8 / 0.3 rad/s with acc 2.0 and a 0.2 rad yaw tolerance the robot overshot the
+  # final heading, turned back, overshot again ("Robot is oscillating") - skid-steer + localization lag.
+  max_vel_theta: 0.5
+  min_vel_theta: 0.25   # 0.15 is likely below what the skid-steer turns at (stalls, then hunts)
+  acc_lim_x: 0.6
+  acc_lim_y: 0.0
+  acc_lim_theta: 0.8
+  # Skid-steer can't sidestep: a goal missed by ~0.3 m sideways meant turn ~100 deg, creep, turn back ~180 deg
+  # (looked like spinning at the goal, lab2 2026-10-18). Patrol goals don't need tighter.
+  xy_goal_tolerance: 0.35
+  yaw_goal_tolerance: 0.5    # rad (~29 deg)
+  latch_xy_goal_tolerance: true
+  sim_time: 2.0
+  sim_granularity: 0.025
+  vx_samples: 15
+  vy_samples: 1
+  vth_samples: 30
+  twirling_scale: 0.0
+  path_distance_bias: 24.0
+  goal_distance_bias: 24.0
+  oscillation_reset_dist: 0.05
+  prune_plan: true
+  occdist_scale: 0.02
+  forward_point_distance: 0.325
+  holonomic_robot: false
+
+# rotate_recovery reads these from ~/TrajectoryPlannerROS (not the DWA namespace); default 1.0 rad/s spun hard
+TrajectoryPlannerROS:
+  max_vel_theta: 0.5
+  max_rotational_vel: 0.5
+  min_in_place_vel_theta: 0.15
+  min_in_place_rotational_vel: 0.15
+  acc_lim_theta: 0.8
+  acc_lim_th: 0.8

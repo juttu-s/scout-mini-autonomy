@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>slam_eval</name>
+  <version>0.1.0</version>
+  <description>Offline comparison of DLIO, FAST-LIO, LIO-SAM and RTAB-Map on one recorded rosbag: trajectories (TUM), CPU time, peak RSS, per-scan latency, and an evo comparison table and plots.</description>
+  <maintainer email="juttu.s@northeastern.edu">agile</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <exec_depend>direct_lidar_inertial_odometry</exec_depend>
+  <exec_depend>fast_lio</exec_depend>
+  <exec_depend>lio_sam</exec_depend>
+  <exec_depend>rtabmap_ros</exec_depend>
+  <exec_depend>livox_ros_driver2</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+</package>

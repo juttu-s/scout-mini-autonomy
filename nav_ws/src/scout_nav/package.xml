@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>scout_nav</name>
+  <version>0.1.0</version>
+  <description>Navigation for the Scout Mini on a 3D lidar map: DLIO mapping, hdl_localization in the saved map, 2D grid projected from the 3D map, move_base through the scout_safety layer.</description>
+  <maintainer email="juttu.s@northeastern.edu">agile</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <exec_depend>scout_safety</exec_depend>
+  <exec_depend>hdl_localization</exec_depend>
+  <exec_depend>move_base</exec_depend>
+  <exec_depend>map_server</exec_depend>
+  <exec_depend>dwa_local_planner</exec_depend>
+  <exec_depend>global_planner</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+</package>

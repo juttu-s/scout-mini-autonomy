@@ -1,0 +1,28 @@
+# nvinfer config for the DeepStream backend of detector_node.py: YOLO11s (DeepStream-Yolo ONNX export + parser),
+# FP16, 640 input. Paths are relative to this file. Built engine is cached next to the ONNX.
+[property]
+gpu-id=0
+net-scale-factor=0.0039215697906911373
+model-color-format=0
+onnx-file=../../models/yolo11s_ds.onnx
+model-engine-file=../../models/yolo11s_ds_b1_gpu0_fp16.engine
+labelfile-path=../../models/coco_labels.txt
+batch-size=1
+network-mode=2
+num-detected-classes=80
+interval=0
+gie-unique-id=1
+process-mode=1
+network-type=0
+cluster-mode=2
+maintain-aspect-ratio=1
+symmetric-padding=1
+parse-bbox-func-name=NvDsInferParseYolo
+custom-lib-path=../../models/libnvdsinfer_custom_impl_Yolo.so
+engine-create-func-name=NvDsInferYoloCudaEngineGet
+
+[class-attrs-all]
+# same as the ROS detector: NMS IoU 0.5; low pre-cluster threshold so the tracker also sees weak boxes
+nms-iou-threshold=0.5
+pre-cluster-threshold=0.1
+topk=300

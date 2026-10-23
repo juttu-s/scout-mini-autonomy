@@ -1,0 +1,64 @@
+# Methods run by run_slam_eval.py. Per method:
+#   launch        slam_eval launch file (gets out:=<run dir>)
+#   play          bag topics to play (originals + eval/derived.bag); never the recorded /tf or DLIO odometry
+#   input         per-scan (or per-frame) input topic: latency starts when the probe receives it
+#   output        per-scan output topic, stamped with the input's stamp + stamp_offset (s): latency ends there
+#   odom          nav_msgs/Odometry with the method's pose -> <method>_online.tum
+#   body_to_lidar translation from the odom child frame to the MID360 (m), so every trajectory is the lidar's
+#   final         loop-closed trajectory: {path: <nav_msgs/Path topic>} (last message received is kept) or
+#                 {rtabmap: <ns>} (graph exported by rtabmap_export.py when the bag has ended)
+#   nodes         ROS node names whose processes are timed (CPU, RSS)
+dlio:
+  launch: dlio.launch
+  play: [/livox/lidar, /livox/imu, /tf_static]
+  input: /livox/lidar
+  output: /dlio/odom_node/pointcloud/deskewed   # published at the end of each scan, scan header stamp
+  stamp_offset: 0.0
+  odom: /dlio/odom_node/odom                     # IMU-rate (~100 Hz), base_link = MID360
+  body_to_lidar: [0.0, 0.0, 0.0]
+  nodes: [/dlio_odom, /dlio_map]
+
+fast_lio:
+  launch: fast_lio.launch
+  play: [/livox/custom, /livox/imu, /tf_static]
+  input: /livox/custom
+  output: /Odometry
+  stamp_offset: 0.1                              # FAST-LIO stamps scan end (last point), MID360 scans are 0.1 s
+  odom: /Odometry                                # child frame = IMU ("body")
+  body_to_lidar: [-0.011, -0.02329, 0.04412]     # MID360 lidar in its IMU frame (extrinsic_T)
+  nodes: [/laserMapping]
+
+lio_sam:
+  launch: lio_sam.launch
+  play: [/livox/points_ring, /livox/imu_ms2, /tf_static]
+  input: /livox/points_ring
+  output: /lio_sam/mapping/odometry
+  stamp_offset: 0.0
+  odom: /lio_sam/mapping/odometry                # lidar pose (LIO-SAM works in the lidar frame)
+  body_to_lidar: [0.0, 0.0, 0.0]
+  final: {path: /lio_sam/mapping/path}           # last message = the loop-closed path
+  nodes: [/lio_sam_imuPreintegration, /lio_sam_imageProjection, /lio_sam_featureExtraction, /lio_sam_mapOptmization]
+
+rtabmap_icp:
+  launch: rtabmap_icp.launch
+  play: [/livox/points_ring, /livox/imu_ms2, /camera/camera/color/image_raw, /camera/camera/color/camera_info,
+         /camera/camera/aligned_depth_to_color/image_raw, /tf_static]
+  input: /livox/points_ring
+  output: /rtabmap/odom
+  stamp_offset: 0.0
+  odom: /rtabmap/odom
+  body_to_lidar: [0.0, 0.0, 0.0]
+  final: {rtabmap: /rtabmap}                     # optimised graph from get_map_data (rtabmap_export.py)
+  nodes: [/rgbd_sync, /rtabmap/icp_odometry, /rtabmap/rtabmap]
+
+rtabmap_rgbd:
+  launch: rtabmap_rgbd.launch
+  play: [/camera/camera/color/image_raw, /camera/camera/color/camera_info,
+         /camera/camera/aligned_depth_to_color/image_raw, /tf_static]
+  input: /camera/camera/aligned_depth_to_color/image_raw   # ~16 Hz; frames are synced on depth
+  output: /rtabmap/odom
+  stamp_offset: 0.0
+  odom: /rtabmap/odom                                      # base_link via the bag's camera mount (cam_x/y placeholders)
+  body_to_lidar: [0.0, 0.0, 0.0]
+  final: {rtabmap: /rtabmap}                     # optimised graph from get_map_data (rtabmap_export.py)
+  nodes: [/rgbd_sync, /rtabmap/rgbd_odometry, /rtabmap/rtabmap]

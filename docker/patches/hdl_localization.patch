@@ -1,0 +1,57 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 1542765..3307e6d 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -2,8 +2,9 @@ cmake_minimum_required(VERSION 2.8.3)
+ project(hdl_localization)
+ 
+ if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+-  add_definitions(-std=c++11)
+-  set(CMAKE_CXX_FLAGS "-std=c++11")
++  # PCL 1.10 (Noetic) needs C++14+ (local patch; upstream used c++11 here)
++  add_definitions(-std=c++17)
++  set(CMAKE_CXX_FLAGS "-std=c++17")
+ else()
+ 	# -mavx causes a lot of errors!!
+   if("$ENV{ROS_DISTRO}" STRGREATER "melodic")
+diff --git a/apps/hdl_localization_nodelet.cpp b/apps/hdl_localization_nodelet.cpp
+index 210f648..5d7d4ba 100644
+--- a/apps/hdl_localization_nodelet.cpp
++++ b/apps/hdl_localization_nodelet.cpp
+@@ -54,13 +54,18 @@ public:
+     odom_child_frame_id = private_nh.param<std::string>("odom_child_frame_id", "base_link");
+ 
+     use_imu = private_nh.param<bool>("use_imu", true);
++    // Local patch: post-date map -> odom like AMCL's transform_tolerance. The correction is stamped with the scan
++    // time (0.3-0.5 s old once matching finishes), so move_base could not transform plans at the current time.
++    tf_future_offset = private_nh.param<double>("tf_future_offset", 0.0);
+     invert_acc = private_nh.param<bool>("invert_acc", false);
+     invert_gyro = private_nh.param<bool>("invert_gyro", false);
+     if (use_imu) {
+       NODELET_INFO("enable imu-based prediction");
+       imu_sub = mt_nh.subscribe("/gpsimu_driver/imu_data", 256, &HdlLocalizationNodelet::imu_callback, this);
+     }
+-    points_sub = mt_nh.subscribe("/velodyne_points", 5, &HdlLocalizationNodelet::points_callback, this);
++    // Local patch: queue size as a param (upstream 5). With 5, scans pile up whenever matching takes > 1 scan period
++    // (robot moving, CPU shared) and the pose falls 0.5 s+ behind; 1 always processes the newest scan.
++    points_sub = mt_nh.subscribe("/velodyne_points", private_nh.param<int>("points_queue_size", 5), &HdlLocalizationNodelet::points_callback, this);
+     globalmap_sub = nh.subscribe("/globalmap", 1, &HdlLocalizationNodelet::globalmap_callback, this);
+     initialpose_sub = nh.subscribe("/initialpose", 8, &HdlLocalizationNodelet::initialpose_callback, this);
+ 
+@@ -412,7 +417,7 @@ private:
+ 
+       geometry_msgs::TransformStamped odom_trans;
+       odom_trans.transform = tf2::toMsg(odom_wrt_map);
+-      odom_trans.header.stamp = stamp;
++      odom_trans.header.stamp = stamp + ros::Duration(tf_future_offset);  // local patch, see onInit
+       odom_trans.header.frame_id = "map";
+       odom_trans.child_frame_id = robot_odom_frame_id;
+ 
+@@ -509,6 +514,7 @@ private:
+   std::string robot_odom_frame_id;
+   std::string odom_child_frame_id;
+ 
++  double tf_future_offset;  // local patch: post-date map -> odom (s)
+   bool use_imu;
+   bool invert_acc;
+   bool invert_gyro;

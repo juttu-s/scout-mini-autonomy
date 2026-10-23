@@ -1,0 +1,37 @@
+# Scout Mini person-aware safety monitor (scripts/safety_node.py). Distances in metres, speeds in m/s.
+base_frame: base_link
+classes: [0]               # COCO ids that are protected (0 = person)
+rate: 50.0                 # Hz; /cmd_vel republish rate (the Scout SDK expects motion commands at >= 50 Hz)
+
+# Command inputs: the highest-priority input that is fresh (newer than timeout) drives the robot.
+inputs:
+  - {topic: /teleop/cmd_vel, priority: 10, timeout: 0.5}   # a human always overrides autonomy
+  - {topic: /nav/cmd_vel,    priority: 5,  timeout: 0.5}
+output_topic: /cmd_vel
+odom_topic: /odom          # scout_base wheel odometry (measured speed)
+
+# Speed caps. Keep max_speed low for first trials. The camera only sees forward, so reversing is blind.
+max_speed: 0.5
+max_reverse_speed: 0.2
+max_angular: 1.0
+min_slow_speed: 0.1        # slowest speed in the slow zone (above 0 so the robot can still creep)
+
+# Geometry (MEASURE on the robot): base_link origin to front bumper, half the body width
+front_offset: 0.31
+half_width: 0.30
+lateral_margin: 0.30       # corridor = half_width + lateral_margin either side of the robot's centre line
+footprint_radius: 0.42     # circle around base_link that contains the robot
+turn_margin: 0.30          # anyone within footprint_radius + turn_margin: no motion at all, not even turning
+
+# Zones (clearance from the front bumper)
+stop_distance: 0.8         # at standstill; grows with speed: + v*reaction_time + v^2/(2*decel)
+slow_distance: 2.0         # forward speed scales from 0 at the stop distance to max_speed here
+reaction_time: 0.3         # s; camera -> detection -> command latency (~0.1-0.15 s measured) + margin
+decel: 1.0                 # m/s^2; MEASURE the Scout Mini's braking on your floor
+ttc_stop: 1.5              # s; stop if a tracked person's path will enter the safety circle sooner
+no_depth_stop_height: 0.5  # a person box taller than this fraction of the image without depth = very close
+
+# Health
+max_detection_age: 0.3     # s; older detector output (stalled detector or camera) -> FAULT, all zero
+recover_time: 1.0          # s of healthy input before leaving FAULT
+clear_time: 0.5            # s: the most restrictive limit of this window applies (no flicker between states)

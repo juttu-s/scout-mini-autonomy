@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.0.2)
+project(scout_nav)
+find_package(catkin REQUIRED)
+catkin_package()
+catkin_install_python(PROGRAMS scripts/pcd_to_grid.py scripts/estimate_camera_mount.py scripts/bag_to_dense_map.py DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+install(DIRECTORY launch config DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})

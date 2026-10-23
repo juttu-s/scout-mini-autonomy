@@ -1,0 +1,76 @@
+<launch>
+  <!-- Navigation in a saved 3D map:  roslaunch scout_nav navigation.launch map:=lab
+       Needs ~/maps/<map>/dlio_map.pcd + grid.yaml + costmap_heights.yaml (from save_map.sh).
+       Send goals from Foxglove/RViz to /move_base_simple/goal. move_base drives /nav/cmd_vel, which goes through
+       the scout_safety layer (people slow/stop it; teleop on /teleop/cmd_vel overrides it). -->
+  <arg name="map"/>
+  <arg name="map_dir"    default="$(env HOME)/maps/$(arg map)"/>
+  <arg name="with_robot" default="true"/>
+  <arg name="foxglove"   default="true"/>
+  <arg name="init_x"     default="0.0"/>
+  <arg name="init_y"     default="0.0"/>
+  <arg name="init_yaw"   default="0.0"/>
+  <arg name="lidar_height" default="0.76"/>
+  <arg name="global_localization" default="true"/>  <!-- enables rosservice call /relocalize -->  <!-- MID360 centre above the floor (measured) -->
+
+  <include if="$(arg with_robot)" file="$(find scout_safety)/launch/robot.launch">
+    <arg name="foxglove" value="$(arg foxglove)"/>
+  </include>
+
+  <!-- The MID360 cloud is in livox_frame; DLIO uses the lidar as base_link (baselink2lidar = identity). -->
+  <node pkg="tf2_ros" type="static_transform_publisher" name="base_to_livox" args="0 0 0 0 0 0 base_link livox_frame"/>
+
+  <!-- The Livox driver outputs (0,0,0) for beams with no return (~18 % of a MID360 scan). Inside the obstacle height
+       band they would mark the robot's own cell lethal, so drop everything within +-0.4 m of the lidar
+       (also catches returns from the robot itself). Costmaps and localization use the filtered cloud. -->
+  <node pkg="nodelet" type="nodelet" name="lidar_filter_manager" args="manager"/>
+  <node pkg="nodelet" type="nodelet" name="lidar_crop" args="load pcl/CropBox lidar_filter_manager">
+    <remap from="~input" to="/livox/lidar"/>
+    <remap from="~output" to="/livox/lidar_filtered"/>
+    <rosparam>
+      min_x: -0.4
+      max_x: 0.4
+      min_y: -0.4
+      max_y: 0.4
+      min_z: -0.4
+      max_z: 0.4
+      negative: true
+      keep_organized: false
+    </rosparam>
+  </node>
+
+  <include file="$(find scout_nav)/launch/localization.launch">
+    <arg name="map_dir"  value="$(arg map_dir)"/>
+    <arg name="points_topic" value="/livox/lidar_filtered"/>
+    <arg name="init_x"   value="$(arg init_x)"/>
+    <arg name="init_y"   value="$(arg init_y)"/>
+    <arg name="init_yaw" value="$(arg init_yaw)"/>
+    <arg name="global_localization" value="$(arg global_localization)"/>
+  </include>
+
+  <!-- Floor-level frames for move_base: DLIO's odom (and so map) has z = 0 at the lidar, 0.76 m above the floor,
+       and costmap_2d's VoxelLayer can't use a negative origin_z. -->
+  <node pkg="tf2_ros" type="static_transform_publisher" name="map_to_floor"
+        args="0 0 -$(arg lidar_height) 0 0 0 map map_floor"/>
+  <node pkg="tf2_ros" type="static_transform_publisher" name="odom_to_floor"
+        args="0 0 -$(arg lidar_height) 0 0 0 odom odom_floor"/>
+
+  <node pkg="map_server" type="map_server" name="map_server" args="$(arg map_dir)/grid.yaml">
+    <param name="frame_id" value="map_floor"/>
+  </node>
+
+  <!-- after every pose estimate (/initialpose), clear the costmaps: scans stamped under the old (wrong) pose
+       otherwise stay as ghost obstacles -->
+  <node pkg="scout_nav" type="clear_on_relocalize.py" name="clear_on_relocalize" output="screen"/>
+
+  <node pkg="move_base" type="move_base" name="move_base" output="screen">
+    <rosparam file="$(find scout_nav)/config/costmap_common.yaml" command="load" ns="global_costmap"/>
+    <rosparam file="$(find scout_nav)/config/costmap_common.yaml" command="load" ns="local_costmap"/>
+    <rosparam file="$(find scout_nav)/config/global_costmap.yaml" command="load"/>
+    <rosparam file="$(find scout_nav)/config/local_costmap.yaml" command="load"/>
+    <rosparam file="$(find scout_nav)/config/planners.yaml" command="load"/>
+    <rosparam file="$(arg map_dir)/costmap_heights.yaml" command="load"/>
+    <remap from="cmd_vel" to="/nav/cmd_vel"/>
+    <remap from="odom" to="/odom"/>   <!-- Scout wheel odometry: body-frame velocity for DWA -->
+  </node>
+</launch>

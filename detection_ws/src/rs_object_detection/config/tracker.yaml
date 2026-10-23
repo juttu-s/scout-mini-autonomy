@@ -1,0 +1,11 @@
+# ByteTrack settings for the detector (ultralytics format). With tracking on, the detector runs
+# at track_low_thresh and these thresholds replace ~conf: tracks start at new_track_thresh and are
+# kept alive through low-confidence frames, which is ByteTrack's main idea.
+tracker_type: bytetrack_gated   # ByteTrack + class gate, registered by detector_node.py
+gate_classes: [0]        # tracks of these classes only match detections of the same class (0 = person)
+track_high_thresh: 0.4   # first-stage association; same as the untracked ~conf
+track_low_thresh: 0.1    # second-stage association with weak detections (occlusion, blur)
+new_track_thresh: 0.4    # min score to start a new track
+track_buffer: 30         # frames a lost track is kept before its id is dropped (~1.2 s at 24 FPS)
+match_thresh: 0.8        # IoU-cost gate for association
+fuse_score: True

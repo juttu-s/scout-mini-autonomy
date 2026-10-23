@@ -1,0 +1,35 @@
+# Python packages of the detector, pinned to what ~/projects/rs_detection/.venv runs on the Orin (pip freeze,
+# 2026-10-22). torch, torchvision and pyds are installed separately in the Dockerfile (Jetson wheels / source).
+# Installed with --no-deps so pip can't swap in versions the venv never used.
+ultralytics==8.4.174
+ultralytics-thop==2.2.2
+numpy==1.23.5
+opencv-python==4.12.0.88
+matplotlib==3.7.5
+contourpy==1.1.1
+fonttools==4.57.0
+cycler==0.10.0
+kiwisolver==1.0.1
+pyparsing==2.4.6
+python-dateutil==2.7.3
+pillow==10.4.0
+polars==1.8.2
+psutil==7.2.2
+lap==0.5.13
+requests==2.32.4
+charset-normalizer==3.5.2
+idna==2.8
+urllib3==1.25.8
+certifi==2019.11.28
+packaging==26.2
+filelock==3.16.1
+typing_extensions==4.13.2
+sympy==1.13.3
+mpmath==1.3.0
+networkx==3.1
+importlib_resources==6.4.5
+zipp==3.20.2
+onnx==1.17.0
+protobuf==5.29.6
+ml-dtypes==0.2.0
+nvidia-ml-py==13.615.71

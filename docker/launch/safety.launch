@@ -1,0 +1,8 @@
+<launch>
+  <!-- scout-safety container: the safety monitor only (robot.launch's scout_safety node, same config).
+       The heartbeat file feeds the container health check (docker/common/healthcheck.sh). -->
+  <node pkg="scout_safety" type="safety_node.py" name="scout_safety" output="screen" required="true">
+    <rosparam command="load" file="$(find scout_safety)/config/safety.yaml"/>
+    <param name="heartbeat_file" value="/run/scout/safety.alive"/>
+  </node>
+</launch>

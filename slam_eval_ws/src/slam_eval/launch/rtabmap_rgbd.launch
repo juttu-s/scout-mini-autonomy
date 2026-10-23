@@ -1,0 +1,41 @@
+<launch>
+  <!-- RTAB-Map, camera-only variant: RGB-D visual odometry (frame-to-map) on colour + aligned depth, graph SLAM with
+       visual loop closure. No lidar, no IMU. -->
+  <arg name="out" default="/tmp"/>
+  <include file="$(find slam_eval)/launch/common.launch"/>
+
+  <node pkg="rtabmap_sync" type="rgbd_sync" name="rgbd_sync" output="screen">
+    <remap from="rgb/image"       to="/camera/camera/color/image_raw"/>
+    <remap from="depth/image"     to="/camera/camera/aligned_depth_to_color/image_raw"/>
+    <remap from="rgb/camera_info" to="/camera/camera/color/camera_info"/>
+    <param name="approx_sync" value="true"/>
+    <param name="approx_sync_max_interval" value="0.02"/>
+  </node>
+
+  <group ns="rtabmap">
+    <node pkg="rtabmap_odom" type="rgbd_odometry" name="rgbd_odometry" output="screen">
+      <remap from="rgbd_image" to="/rgbd_image"/>
+      <remap from="odom"       to="/rtabmap/odom"/>
+      <param name="frame_id"       value="base_link"/>
+      <param name="odom_frame_id"  value="odom"/>
+      <param name="subscribe_rgbd" value="true"/>
+      <param name="Odom/Strategy"  value="0"/>   <!-- frame-to-map -->
+      <param name="Vis/MaxFeatures" value="600"/>
+      <param name="Odom/ResetCountdown" value="1"/>  <!-- re-init after a lost frame instead of stopping for good -->
+    </node>
+
+    <node pkg="rtabmap_slam" type="rtabmap" name="rtabmap" output="screen" args="--delete_db_on_start">
+      <remap from="rgbd_image" to="/rgbd_image"/>
+      <remap from="odom"       to="/rtabmap/odom"/>
+      <param name="database_path"   value="$(arg out)/rtabmap.db"/>
+      <param name="frame_id"        value="base_link"/>
+      <param name="subscribe_depth" value="false"/>
+      <param name="subscribe_rgb"   value="false"/>
+      <param name="subscribe_rgbd"  value="true"/>
+      <param name="sync_queue_size" value="30"/>
+      <param name="Reg/Strategy"    value="0"/>   <!-- visual -->
+      <param name="RGBD/CreateOccupancyGrid" value="false"/>
+      <param name="Mem/STMSize"     value="30"/>
+    </node>
+  </group>
+</launch>

@@ -1,0 +1,127 @@
+# Scout Mini stack as four containers that talk over ROS 1 (one master, host networking).
+#
+#   ~/robot_up.sh [--nav <map> [x y yaw]]     start (after ~/can_up.sh)
+#   ~/robot_down.sh                           stop (closes recordings first)
+#   docker/build.sh                           build + tag the images
+#
+# Split by failure domain (see docker/README.md):
+#   master      rosmaster + rosout. Never restarted: ROS 1 nodes do not re-register with a new master.
+#   safety      the only /cmd_vel publisher. Tiny, no GPU; FAULTs (all zero) when the detector goes stale.
+#   perception  RealSense + YOLO detector (DeepStream/TensorRT/torch). Heavy; may crash and restart.
+#   base        Scout base over CAN, MID360, DLIO, Foxglove, and with SCOUT_NAV=true localization + move_base.
+# Host networking: the MID360 talks UDP on the host's LAN, can0 lives in the host network namespace, and ROS 1 uses
+# random TCP ports; inter-container ROS traffic is plain localhost TCP, exactly as between native processes.
+name: scout
+
+x-ros: &ros
+  network_mode: host
+  init: true                      # tini as PID 1: reaps zombies, forwards signals to roslaunch
+  stop_signal: SIGINT             # roslaunch shuts its nodes down cleanly on SIGINT
+  environment: &ros-env
+    ROS_MASTER_URI: http://localhost:11311
+    ROS_LOG_DIR: /home/agile/.ros/log
+  volumes: &ros-vol
+    - /etc/localtime:/etc/localtime:ro
+    - scout_run:/run/scout        # heartbeat files (tmpfs) for the health checks
+
+services:
+  master:
+    <<: *ros
+    image: scout-safety:${TAG:-latest}
+    command: ["roscore", "-p", "11311"]
+    restart: "no"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${HOME}/.ros/docker_logs/master:/home/agile/.ros/log
+    healthcheck:
+      test: ["CMD", "bash", "-c", "</dev/tcp/127.0.0.1/11311"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  safety:
+    <<: *ros
+    image: scout-safety:${TAG:-latest}
+    build:
+      context: ..
+      dockerfile: docker/safety/Dockerfile
+    restart: on-failure
+    stop_grace_period: 30s
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - scout_run:/run/scout
+      - ${HOME}/.ros/docker_logs/safety:/home/agile/.ros/log
+    depends_on:
+      master: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "/run/scout/safety.alive", "3"]
+      interval: 5s
+      timeout: 2s
+      retries: 3
+      start_period: 20s
+
+  base:
+    <<: *ros
+    image: scout-base:${TAG:-latest}
+    build:
+      context: ..
+      dockerfile: docker/base/Dockerfile
+    command: ["roslaunch", "--wait", "/opt/scout/launch/base.launch",
+              "nav:=${SCOUT_NAV:-false}", "map:=${SCOUT_MAP:-}",
+              "init_x:=${SCOUT_INIT_X:-0.0}", "init_y:=${SCOUT_INIT_Y:-0.0}", "init_yaw:=${SCOUT_INIT_YAW:-0.0}"]
+    restart: on-failure:3
+    stop_grace_period: 120s       # may be closing a multi-GB rosbag (record_nav.sh / record_session.sh)
+    environment:
+      <<: *ros-env
+      BAG_ROOT: /home/agile/bags
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - scout_run:/run/scout
+      - ${HOME}/.ros/docker_logs/base:/home/agile/.ros/log
+      - ${HOME}/maps:/home/agile/maps
+      - ${HOME}/bags:/home/agile/bags
+    depends_on:
+      master: {condition: service_healthy}
+      safety: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "/run/scout/base.alive", "3"]
+      interval: 5s
+      timeout: 2s
+      retries: 3
+      start_period: 60s
+
+  perception:
+    <<: *ros
+    image: scout-perception:${TAG:-latest}
+    build:
+      context: ..
+      dockerfile: docker/perception/Dockerfile
+    runtime: nvidia
+    restart: on-failure:3
+    stop_grace_period: 30s
+    # The D455 re-enumerates its USB device on initial_reset, so a fixed device path breaks: all of /dev is
+    # bind-mounted, but the device cgroup only admits USB (189) and V4L (81) character devices; udev rules stay
+    # on the host. Narrower than --privileged.
+    device_cgroup_rules:
+      - "c 189:* rmw"
+      - "c 81:* rmw"
+    group_add: ["video"]
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - scout_run:/run/scout
+      - ${HOME}/.ros/docker_logs/perception:/home/agile/.ros/log
+      - /dev:/dev
+    depends_on:
+      master: {condition: service_healthy}
+      safety: {condition: service_healthy}
+      base: {condition: service_started}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "/run/scout/perception.alive", "3"]
+      interval: 5s
+      timeout: 2s
+      retries: 3
+      start_period: 120s          # TensorRT engine deserialization + camera start
+
+volumes:
+  scout_run:
+    driver_opts: {type: tmpfs, device: tmpfs, o: "size=1m,uid=1000,gid=1000"}

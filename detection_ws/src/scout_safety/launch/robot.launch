@@ -1,0 +1,71 @@
+<launch>
+  <!-- Full Scout Mini bringup with person-aware safety. Before launching (needs sudo):
+         sudo modprobe gs_usb && rosrun scout_bringup bringup_can2usb.bash
+       Command sources must publish to the safety inputs, not to /cmd_vel:
+         teleop:      rosrun teleop_twist_keyboard teleop_twist_keyboard.py cmd_vel:=/teleop/cmd_vel
+         navigation:  remap the planner's cmd_vel to /nav/cmd_vel -->
+
+  <!-- Camera mount: base_link -> camera_link. MEASURE these (metres / radians); placeholders below. -->
+  <arg name="cam_x"     default="0.30"/>    <!-- PLACEHOLDER: measure camera centre ahead of the MID360 centre -->
+  <arg name="cam_y"     default="0.0"/>
+  <arg name="cam_z"     default="-0.225"/>  <!-- estimated from the floor 2026-10-17: camera 0.535 m above floor, lidar 0.76 m -->
+  <arg name="cam_yaw"   default="0.0"/>
+  <arg name="cam_pitch" default="-0.0199"/> <!-- estimated (rosrun scout_nav estimate_camera_mount.py) -->
+  <arg name="cam_roll"  default="0.0023"/>  <!-- estimated -->
+
+  <arg name="robot"     default="true"/>   <!-- false: no Scout/lidar/DLIO (bench test of camera + safety) -->
+  <arg name="safety"    default="true"/>
+  <arg name="foxglove"  default="false"/>
+  <arg name="backend"   default="deepstream"/>  <!-- detector inference: deepstream (low CPU) or ultralytics -->
+  <arg name="initial_reset" default="false"/>
+  <!-- D455 built-in IMU (gyro 200 Hz + accel 100 Hz, merged on /camera/camera/imu); used for recordings -->
+  <arg name="camera_imu"    default="false"/>  <!-- true resets the camera USB at start (slower start) -->
+
+  <group if="$(arg robot)">
+    <include file="$(find scout_bringup)/launch/scout_robot_base.launch"/>
+    <include file="$(find livox_ros_driver2)/launch_ROS1/msg_MID360.launch"/>
+    <include file="$(find direct_lidar_inertial_odometry)/launch/dlio.launch">
+      <arg name="pointcloud_topic" value="/livox/lidar"/>
+      <arg name="imu_topic"        value="/livox/imu"/>
+      <arg name="robot_namespace"  value="/"/>
+    </include>
+    <!-- DLIO's map node stays at its 25 cm default. A 5 cm override (2026-10-17) did not make the saved map denser
+         (DLIO's keyframes are already 25 cm) but made the map message it re-publishes on every keyframe grow to
+         8.5 MB+, which stalled the Jetson (~0.65 s) while driving. Dense maps come from bag_to_dense_map.py. -->
+  </group>
+
+  <!-- Camera: raw depth, no CPU align/filters; the detector registers depth on the GPU. -->
+  <include file="$(find realsense2_camera)/launch/rs_camera.launch">
+    <arg name="camera"        value="camera/camera"/>
+    <arg name="tf_prefix"     value="camera"/>
+    <arg name="initial_reset" value="$(arg initial_reset)"/>
+    <arg name="align_depth"   value="false"/>
+    <arg name="color_width"   value="848"/>
+    <arg name="color_height"  value="480"/>
+    <arg name="depth_width"   value="848"/>
+    <arg name="depth_height"  value="480"/>
+    <arg name="color_fps"     value="30"/>
+    <arg name="depth_fps"     value="30"/>
+    <arg name="enable_gyro"   value="$(arg camera_imu)"/>
+    <arg name="enable_accel"  value="$(arg camera_imu)"/>
+    <arg name="gyro_fps"      value="200"/>
+    <arg name="accel_fps"     value="100"/>
+    <arg name="unite_imu_method" value="$(eval 'linear_interpolation' if camera_imu else '')"/>
+  </include>
+
+  <node pkg="tf2_ros" type="static_transform_publisher" name="base_to_camera"
+        args="$(arg cam_x) $(arg cam_y) $(arg cam_z) $(arg cam_yaw) $(arg cam_pitch) $(arg cam_roll) base_link camera_link"/>
+
+  <include file="$(find rs_object_detection)/launch/detection.launch">
+    <arg name="output_frame"   value="base_link"/>
+    <arg name="velocity_frame" value="odom" if="$(arg robot)"/>
+    <arg name="velocity_frame" value=""     unless="$(arg robot)"/>
+    <arg name="foxglove"       value="$(arg foxglove)"/>
+    <arg name="backend"        value="$(arg backend)"/>
+    <arg name="publish_aligned_depth" value="true"/>  <!-- aligned_depth_to_color for nav stacks -->
+  </include>
+
+  <node if="$(arg safety)" pkg="scout_safety" type="safety_node.py" name="scout_safety" output="screen" required="true">
+    <rosparam command="load" file="$(find scout_safety)/config/safety.yaml"/>
+  </node>
+</launch>
