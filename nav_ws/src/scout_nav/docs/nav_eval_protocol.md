@@ -32,7 +32,7 @@ until move_base reports a result, the timeout expires, or the operator cancels.
 | `min_inlier` | worst localization inlier fraction during the goal (a drop means localization struggled) |
 | `costmaps_cleared` | 1 = costmaps cleared just before the goal (the default; see section 5) |
 
-Expected values for a clean lap (dry run, 2026-10-23): plan lengths 7.4, 6.6, 1.1, 9.0, 10.1, 1.2, 8.9 m (A … F, home).
+Expected values for a clean lap (2026-10-23): plan lengths 5.2, 6.6, 1.1, 9.0, 10.1, 1.2, 6.6 m (A … F, home2).
 So `path_ratio` should be near 1.1–1.4, and well above that means detours or weaving.
 
 ## 2. Physical setup (every session)
@@ -47,9 +47,11 @@ So `path_ratio` should be near 1.1–1.4, and well above that means detours or w
      goal runs.
    - Nobody walks next to or behind the robot except the operator (section 7, items 1–2).
 3. **Start mark:**
-   - Floor tape at `home`, map (−0.22, 0.28). Put it there once by driving the robot there with localization good and
+   - Floor tape at `home2`, map (2.08, 0.33). Put it there once by driving the robot there with localization good and
      taping the lidar's position (the MID360 is `base_link`).
-   - Place the robot on the tape facing 60° in the map, i.e. towards goal A.
+   - Place the robot on the tape facing 83° in the map, i.e. towards goal A.
+   - The first home, (−0.22, 0.28), was dropped: it sits in a pocket that is 0.40 m wide on the way in, and twice the
+     robot couldn't finish there because it had no room to turn round.
 4. **Robot:**
    - battery charged;
    - remote switched to **CAN / command mode**;
@@ -63,7 +65,7 @@ So `path_ratio` should be near 1.1–1.4, and well above that means detours or w
 
 ```bash
 ~/can_up.sh                                          # sudo; CAN at 500 kbit/s
-~/robot_up.sh --nav lab2 -0.22 0.28 1.047            # all four containers, navigation started at home
+~/robot_up.sh --nav lab2 2.08 0.33 1.449             # all four containers, navigation started at home2 (83°)
 source ~/ros_utils/setup.bash
 rostopic echo -n1 /localization/status | grep inlier # must be > 0.95; else 2D Pose Estimate in Foxglove
 rosrun scout_nav eval_nav_goals.py $(rospack find scout_nav)/config/nav_eval_goals_lab2.yaml --dry-run
@@ -81,23 +83,24 @@ Optional recording (bags go to `~/bags/lab2/nav_runs/`), in a second terminal:
 
 ## 4. The goals
 
-Frame `map`; `home` is the start mark. A lap is A → B → C → D → E → F → home, about 42 m driven.
+Frame `map`; `home2` is the start mark. A lap is A → B → C → D → E → F → home2, about 40 m driven.
 
 | # | name | x | y | yaw ° | clearance at the goal | leg to the next: straight / planned (2026-10-23) / narrowest clearance |
 |---|---|---|---|---|---|---|
-| 0 | home | −0.22 | 0.28 | 60 | 0.65 m | → A: 5.8 / 7.4 m / 0.40 m |
+| 0 | home2 | 2.08 | 0.33 | 83 | 0.97 m (≥ 0.60 m within 0.3 m) | → A: 5.0 / 5.2 m / 0.47 m |
 | 1 | A_aisle_mid | 2.65 | 5.32 | 68 | 0.75 m | → B: 5.4 / 6.6 m / 0.40 m |
 | 2 | B_north | 4.70 | 10.31 | −179 | 1.05 m | → C: 1.1 / 1.1 m / 1.05 m |
 | 3 | C_north_w | 3.59 | 10.30 | −87 | 1.10 m | → D: 7.5 / 9.0 m / **0.35 m** |
 | 4 | D_east_mid | 3.93 | 2.83 | −79 | 0.54 m | → E: 7.1 / 10.1 m / 0.42 m |
 | 5 | E_south | 5.31 | −4.13 | −173 | 0.60 m | → F: 1.0 / 1.2 m / 0.60 m |
-| 6 | F_sw | 4.32 | −4.26 | 135 | 1.07 m | → home: 6.4 / 8.9 m / 0.40 m |
+| 6 | F_sw | 4.32 | −4.26 | 116 | 1.07 m | → home2: 5.1 / 6.6 m / 0.50 m |
 
 - **Clearance** is the distance to the nearest obstacle on the static map. The robot needs 0.31 m: half its width,
   0.29 m, plus 0.02 m padding.
 - **Narrowest** is the tightest point of the best route for that radius.
 - **Each yaw** faces the next goal.
-- Chosen to avoid (0, 0), the old start, which has only 0.35 m clearance.
+- `home2` also has room to turn in place: at least 0.60 m clearance anywhere within 0.3 m of it, so arriving a little
+  off still leaves the 0.45 m the body's corners sweep.
 
 Changing a goal changes what the CSV compares. Re-survey it, update this table and the YAML together, and give the goal
 a new name rather than reusing the old one.
@@ -129,7 +132,7 @@ mark on goal A that no sensor could see blocked two legs. `--no-clear` turns it 
 
 **Where the robot stops:** if a goal ends ABORTED or TIMEOUT, the robot stays where it stopped. Check the spot before
 the next goal. A start inside the inflated band around a desk can't be planned from (see FAILURES F-55 and the
-inscribed-start cases). Push or teleop it about 10 cm into the open, or skip to `home`.
+inscribed-start cases). Push or teleop it about 10 cm into the open, or skip to `home2`.
 
 ## 6. Reading the CSV
 
@@ -165,9 +168,10 @@ The items marked **UNSAFE WITH PEOPLE NEARBY** are why the aisles are closed off
      | B | about 113° |
      | C | about 92° |
      | E | about 94° |
-     | home | about 75° |
-     | F | about 52° |
-     | A, D | under 10° |
+     | F | about 71° |
+     | home2 | about 33° |
+     | A | about 15° |
+     | D | about 8° |
    - At B, C and E it turns close to desks. Stand clear of the robot's sides while it turns.
 3. **UNSAFE WITH PEOPLE NEARBY: tight legs.**
    - On C → D the best route has 0.35 m clearance against the 0.31 m the robot needs, so the body passes within about
