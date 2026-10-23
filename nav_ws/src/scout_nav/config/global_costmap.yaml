@@ -17,7 +17,10 @@ global_costmap:
     map_topic: /map
     track_unknown_space: true   # unknown stays unknown; the planner may still cross it (allow_unknown)
     subscribe_to_updates: false
-  # wide, gentle inflation so global paths run down the middle of aisles (0.6 / 5.0 hugged the desks)
+  # wide, gentle inflation so global paths run down the middle of aisles (0.6 / 5.0 hugged the desks). The radius
+  # doesn't close passages (inscribed = footprint, 0.31 m); it only adds graded cost beyond that band. At 0.4 the
+  # band was 9 cm wide, plans ran along the inscribed edge, and a cut corner left the robot's own cell inscribed:
+  # GlobalPlanner can't start from there (lab2, containers, 2026-10-23). Cost 0.39 m beyond the edge ~ 0.31 of max.
   inflation_layer:
-    inflation_radius: 0.4
-    cost_scaling_factor: 2.5
+    inflation_radius: 0.7
+    cost_scaling_factor: 3.0
