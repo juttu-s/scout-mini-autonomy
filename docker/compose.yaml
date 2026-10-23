@@ -124,6 +124,9 @@ services:
       - scout_run:/run/scout
       - ${HOME}/.ros/docker_logs/perception:/logs
       - /dev:/dev
+      # CUDA's JIT cache. torchvision is sm_86+PTX (torch 2.0 can't target sm_87), so a fresh container spent ~2 min
+      # compiling PTX for the Orin before the first detection (70 MB cache, 2026-10-23); kept across containers here.
+      - scout_cuda_cache:/home/agile/.nv
     depends_on:
       master: {condition: service_healthy}
       safety: {condition: service_healthy}
@@ -136,5 +139,6 @@ services:
       start_period: 120s          # TensorRT engine deserialization + camera start
 
 volumes:
+  scout_cuda_cache: {}
   scout_run:
     driver_opts: {type: tmpfs, device: tmpfs, o: "size=1m,uid=1000,gid=1000"}

@@ -86,6 +86,40 @@ before the stop. Still to check: the timeout at higher speed, on the floor.
 - While base is down, safety stays `OK`: it doesn't treat stale `/odom` as a fault. That's harmless, because no
   CAN writer exists then. It would matter only if odometry stopped while `scout_base` kept running.
 
+## Performance against native (measured 2026-10-23, robot on the stand, 60 s per run)
+
+Same robot, same view, full stack running, nothing driving. Native was measured twice to show the run-to-run
+spread (`latency_probe.py`: detector latency = receive time − camera frame time; DLIO latency = its per-scan path
+message − the scan's arrival; CPU from `/proc`, which sees the containers' processes too).
+
+| | containers | native (2 runs) |
+|---|---|---|
+| camera | 30.0 Hz | 30.0 / 30.0 Hz |
+| detector | 23.1 Hz | 24.5 / 24.3 Hz |
+| detector latency p50 / p95 | 93.0 / 109.6 ms | 96.6 / 114.4, 96.9 / 114.7 ms |
+| `/cmd_vel` rate, jitter (std), worst gap | 50.0 Hz, 0.70 ms, 23.4 ms | 50.0 Hz, 0.76 / 0.75 ms, 24.8 / 23.8 ms |
+| DLIO latency p50 / p95 | 20.5 / 23.2 ms | 18.9 / 20.9, 18.5 / 20.7 ms |
+| system CPU (12 cores) | 22.0 % | 22.8 / 23.7 % |
+| detector / DLIO / safety | 1.01 / 0.51 / 0.17 cores | 1.00 / 0.50 / 0.16 cores |
+| camera driver | **0.16 cores** | 0.38 / 0.38 cores |
+
+- **Safety's 50 Hz output is unchanged.**
+- **Detector:** latency is slightly lower in containers and the rate about 1.3 Hz lower (one container sample).
+  Both are within what the scene and the load change between runs.
+- **DLIO is about 1.6 ms slower in containers**, consistently. The build flags are the same (Release, `-O3`).
+  Not confirmed: Docker's default seccomp filter adds a small cost to every system call. 1.6 ms is negligible
+  against the 100 ms scan period.
+- **The camera driver uses less than half the CPU in the container.** Natively, realsense-ros loads ROS's apt
+  `librealsense2` 2.50 (libusb/RSUSB backend). The image builds 2.57 from source with CUDA and the kernel backend,
+  which is what `~/ros_utils/librealsense` was built for. That's also the fix PROJECT_LOG §14 lists for the D455
+  IMU stall, so `camera_imu:=true` is worth retrying in the container.
+- **Health checks** cost 4.5 ms per check, every 5 s, per container: about 0.1 % of a core in total.
+
+**Start-up: CUDA JIT cache.** torchvision is built as sm_86 + PTX (torch 2.0 can't target the Orin's sm_87), so a
+fresh container spent about 2 minutes JIT-compiling PTX before its first detection, while the 70 MB cache grew in
+`~/.nv/ComputeCache`. That folder is now the named volume `scout_cuda_cache`. A fresh perception container reaches
+full rate in **21 s instead of 139 s**; only the first start after an image change pays the compile again.
+
 ## Test checklist (wheels off the ground for all of it until every item has passed)
 1. `build.sh` succeeds. In perception: `python3 -c "import torch, pyds, ultralytics; print(torch.cuda.is_available())"` prints `True`.
 2. `robot_up.sh`, then check:

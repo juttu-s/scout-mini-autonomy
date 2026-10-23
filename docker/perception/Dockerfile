@@ -87,7 +87,8 @@ RUN . /opt/ros/noetic/setup.sh && catkin_make -DCMAKE_BUILD_TYPE=Release -j"$(np
 COPY docker/common/entrypoint.sh docker/common/healthcheck.sh /usr/local/bin/
 COPY docker/launch/perception.launch /opt/scout/launch/
 RUN printf 'source /opt/ros/noetic/setup.bash\nsource /opt/scout/ws/devel/setup.bash\n' > /opt/scout/setup.bash \
- && useradd -u 1000 -m -d /home/agile -G video agile
+ && useradd -u 1000 -m -d /home/agile -G video agile \
+ && install -d -o agile -g agile /home/agile/.nv   # CUDA JIT cache: a named volume (compose) keeps it
 ENV SCOUT_SETUP=/opt/scout/setup.bash SCOUT_CONTAINER=1 PYTHONUNBUFFERED=1
 USER agile
 WORKDIR /home/agile
