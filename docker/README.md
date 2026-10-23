@@ -70,15 +70,14 @@ TAG=20261022-abc1234 ~/robot_up.sh    # roll back to an older build (docker imag
 | what dies | what happens | verified |
 |---|---|---|
 | perception | safety: detections stale > 0.3 s → FAULT → all motion zero. The entrypoint watchdog sees the heartbeat stale (10 s) and restarts the container; the detector re-registers with the surviving master and safety recovers | **yes, 2026-10-23, wheels not involved:** FAULT after 0.304 s, container restarted, safety re-subscribed, OK again after 29.7 s, 30 FPS |
-| base | nothing sends CAN commands → wheels stop **only if the Scout firmware has a command timeout** | **blocked on the firmware test** |
-| safety | nothing publishes `/cmd_vel`. `scout_base` sends one CAN command per message and doesn't repeat it, so the wheels stop **only via the firmware timeout** | **blocked on the firmware test** |
+| base | nothing sends CAN commands → the Scout firmware stops the wheels by itself **0.60 s** after the last command (measured 2026-10-23 at 0.1 m/s, natively). Safety keeps running | firmware: **yes**; the container crash itself: to test |
+| safety | nothing publishes `/cmd_vel`. `scout_base` sends one CAN command per message and doesn't repeat it, so the wheels stop through the firmware timeout: **0.60 s** | firmware: **yes**; container restart and re-registration: **yes** (without wheels) |
 | master | existing connections keep working; nothing can (re)start → `robot_down.sh` + `robot_up.sh` | to test |
 
-**Gate before trusting the "base" and "safety" rows:** run `rosrun scout_safety firmware_timeout_test.py` with the
-wheels off the ground (PROJECT_LOG.md lists it as not done).
-- **If the firmware does not stop on its own:** add a command watchdog to `scout_base` (a 50 Hz timer that sends
-  zero when `/cmd_vel` is older than 0.2 s), and move `scout_base` into the safety container. The remaining case,
-  the CAN process itself dying mid-motion, is then covered only by the RC handset or e-stop.
+**Firmware timeout, measured** (`rosrun scout_safety firmware_timeout_test.py`, wheels off the ground,
+2026-10-23): the base stops on its own **0.60 s** after commands stop, so the "base" and "safety" rows are fail-safe,
+and the planned fallback watchdog in `scout_base` isn't needed. At the 0.5 m/s cap, that's up to ~0.3 m of motion
+before the stop. Still to check: the timeout at higher speed, on the floor.
 
 ## Test checklist (wheels off the ground for all of it until every item has passed)
 1. `build.sh` succeeds. In perception: `python3 -c "import torch, pyds, ultralytics; print(torch.cuda.is_available())"` prints `True`.
