@@ -18,8 +18,9 @@ launch files in `launch/` include the same pieces with the same defaults.
 ~/ros_utils/docker/build.sh       # build + tag images (first time ~2 h, mostly librealsense/torchvision)
 ~/can_up.sh                       # as before
 ~/robot_up.sh                     # or: ~/robot_up.sh --nav lab2 [x y yaw]
-docker compose -f ~/ros_utils/docker/compose.yaml exec base rosrun scout_nav record_nav.sh lab2   # bags -> ~/bags
-docker compose -f ~/ros_utils/docker/compose.yaml exec safety rosrun scout_safety teleop.sh      # keyboard teleop
+~/robot_exec.sh base rosrun scout_nav record_nav.sh lab2     # bags -> ~/bags
+~/robot_exec.sh safety rosrun scout_safety teleop.sh         # keyboard teleop
+                                  # (robot_exec.sh loads the ROS environment; plain `docker compose exec` doesn't)
 ~/robot_down.sh                   # closes any recording first, then stops perception, base, safety, master
 TAG=20261022-abc1234 ~/robot_up.sh    # roll back to an older build (docker images | grep scout-)
 ```
@@ -55,9 +56,17 @@ TAG=20261022-abc1234 ~/robot_up.sh    # roll back to an older build (docker imag
   the entrypoint stops roslaunch once the heartbeat is older than `HEARTBEAT_MAX_AGE` (10 s), after a start-up
   grace period (`HEARTBEAT_GRACE`: 30 / 180 / 90 s). The container then exits and is restarted. This covers hangs
   as well as crashes. The base heartbeat requires `/odom`, `/livox/lidar` and DLIO's odometry.
-- **`restart: unless-stopped`, not `on-failure`.** When a `required` node dies, roslaunch shuts down and exits
-  with code **0**: a killed `safety_node.py` left its container exited, never restarted (tested 2026-10-23). Docker
-  backs off between restarts, and `docker compose stop` / `docker kill` count as manual stops and aren't restarted.
+- **`restart: on-failure`, with the exit code set by the entrypoint, and never started by a reboot.**
+  - roslaunch exits 0 when a required node dies, so the entrypoint turns any exit it didn't ask for into 1
+    (restarted). A deliberate stop (SIGINT/SIGTERM: `robot_down.sh`, `docker stop`, shutdown) exits 0, so the
+    container is not restarted.
+  - `unless-stopped`, used before, also restarted everything when Docker started at boot. After a reboot on
+    2026-10-23, safety, base and perception came up without a master (`restart: no`) and looped: 24, 11 and 6
+    restarts.
+  - A power cut leaves a non-zero last exit, which `on-failure` would also restart at boot. To cover that,
+    `robot_up.sh` stamps the containers with the kernel boot id (`SCOUT_BOOT_ID`), and a container started in any
+    other boot exits 0 at once.
+  - Tested: a crash restarts the container; a stop exits 0; another boot id refuses to start, with no restart.
 - **Reproducible images.** Third-party code is cloned at the commits pinned in `pins/<name>.repos`, with this
   machine's local changes applied from `pins/<name>.patch` (`third_party.repos` is the same information in one
   file, for reading). Each Dockerfile step copies only the pins it uses, so changing one package rebuilds only the

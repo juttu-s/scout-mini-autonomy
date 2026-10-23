@@ -19,6 +19,7 @@ x-ros: &ros
   stop_signal: SIGINT             # roslaunch shuts its nodes down cleanly on SIGINT
   environment: &ros-env
     ROS_MASTER_URI: http://localhost:11311
+    SCOUT_BOOT_ID: ${SCOUT_BOOT_ID:-}   # set by ~/robot_up.sh; containers refuse to start in another boot (entrypoint)
     ROS_LOG_DIR: /logs             # mounted from ~/.ros/docker_logs/<service>; not under ~/.ros, which a bind mount would make root-owned
   volumes: &ros-vol
     - /etc/localtime:/etc/localtime:ro
@@ -45,7 +46,7 @@ services:
     build:
       context: ..
       dockerfile: docker/safety/Dockerfile
-    restart: unless-stopped         # roslaunch exits 0 when a required node dies, so on-failure would never restart
+    restart: on-failure             # the entrypoint exits 1 on a crash, 0 on a deliberate stop (not restarted at boot)
     stop_grace_period: 30s
     environment:
       <<: *ros-env
@@ -74,7 +75,7 @@ services:
     command: ["roslaunch", "--wait", "/opt/scout/launch/base.launch",
               "nav:=${SCOUT_NAV:-false}", "map:=${SCOUT_MAP:-}",
               "init_x:=${SCOUT_INIT_X:-0.0}", "init_y:=${SCOUT_INIT_Y:-0.0}", "init_yaw:=${SCOUT_INIT_YAW:-0.0}"]
-    restart: unless-stopped         # any exit (roslaunch exits 0 on a crash); Docker backs off between restarts
+    restart: on-failure             # Docker backs off between restarts
     stop_grace_period: 120s       # may be closing a multi-GB rosbag (record_nav.sh / record_session.sh)
     environment:
       <<: *ros-env
@@ -105,7 +106,7 @@ services:
       context: ..
       dockerfile: docker/perception/Dockerfile
     runtime: nvidia
-    restart: unless-stopped
+    restart: on-failure
     stop_grace_period: 30s
     # The D455 re-enumerates its USB device on initial_reset, so a fixed device path breaks: all of /dev is
     # bind-mounted, but the device cgroup only admits USB (189) and V4L (81) character devices; udev rules stay
