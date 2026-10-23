@@ -69,15 +69,22 @@ TAG=20261022-abc1234 ~/robot_up.sh    # roll back to an older build (docker imag
 
 | what dies | what happens | verified |
 |---|---|---|
-| perception | safety: detections stale > 0.3 s → FAULT → all motion zero. The entrypoint watchdog sees the heartbeat stale (10 s) and restarts the container; the detector re-registers with the surviving master and safety recovers | **yes, 2026-10-23, wheels not involved:** FAULT after 0.304 s, container restarted, safety re-subscribed, OK again after 29.7 s, 30 FPS |
-| base | nothing sends CAN commands → the Scout firmware stops the wheels by itself **0.60 s** after the last command (measured 2026-10-23 at 0.1 m/s, natively). Safety keeps running | firmware: **yes**; the container crash itself: to test |
-| safety | nothing publishes `/cmd_vel`. `scout_base` sends one CAN command per message and doesn't repeat it, so the wheels stop through the firmware timeout: **0.60 s** | firmware: **yes**; container restart and re-registration: **yes** (without wheels) |
+| perception | safety: detections stale > 0.3 s → FAULT → all motion zero. The entrypoint watchdog sees the heartbeat stale (10 s) and restarts the container; the detector re-registers with the surviving master and safety recovers | **yes**. Without wheels: FAULT 0.304 s, OK again 29.7 s. On the stand, teleop 0.1 m/s (2026-10-23): wheels stopped 0.55 s after the crash, turning again after 34 s |
+| base | nothing sends CAN commands → the Scout firmware stops the wheels by itself (timeout 0.60 s, measured natively). Safety keeps running; the container restarts (`scout_base_node` is required) | **yes**, on the stand, teleop 0.1 m/s (2026-10-23): wheels stopped 0.81 s after the crash (CAN frame 0x221), container restarted, turning again after 8.1 s |
+| safety | nothing publishes `/cmd_vel`. `scout_base` sends one CAN command per message and doesn't repeat it, so the firmware timeout (0.60 s) stops the wheels; the container restarts | **yes**, on the stand, teleop 0.1 m/s (2026-10-23): wheels stopped 0.84 s after the crash, container restarted, turning again after 7.5 s |
 | master | existing connections keep working; nothing can (re)start → `robot_down.sh` + `robot_up.sh` | to test |
 
 **Firmware timeout, measured** (`rosrun scout_safety firmware_timeout_test.py`, wheels off the ground,
 2026-10-23): the base stops on its own **0.60 s** after commands stop, so the "base" and "safety" rows are fail-safe,
 and the planned fallback watchdog in `scout_base` isn't needed. At the 0.5 m/s cap, that's up to ~0.3 m of motion
 before the stop. Still to check: the timeout at higher speed, on the floor.
+
+**Behaviour found in the crash tests (by design today, decide before autonomy):**
+- After a safety or base restart, the robot starts moving again on its own if a command source is still
+  publishing, because the commands are fresh. For teleop that's the human's command; for `move_base`, a base
+  restart also restarts DLIO (its odom resets), and navigation carries on driving on the new odometry.
+- While base is down, safety stays `OK`: it doesn't treat stale `/odom` as a fault. That's harmless, because no
+  CAN writer exists then. It would matter only if odometry stopped while `scout_base` kept running.
 
 ## Test checklist (wheels off the ground for all of it until every item has passed)
 1. `build.sh` succeeds. In perception: `python3 -c "import torch, pyds, ultralytics; print(torch.cuda.is_available())"` prints `True`.
