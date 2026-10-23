@@ -1,0 +1,6 @@
+repositories:
+  ndt_omp:
+    type: git
+    url: https://github.com/koide3/ndt_omp.git
+    version: 5495fd9214945afcb4b35d5a1da385e405c52bf9
+    patch: ndt_omp.patch

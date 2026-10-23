@@ -5,10 +5,9 @@
 FROM ros:noetic-ros-base-focal AS build
 RUN apt-get update && apt-get install -y --no-install-recommends git python3-yaml && rm -rf /var/lib/apt/lists/*
 WORKDIR /opt/scout/ws
-COPY docker/third_party.repos /opt/scout/docker/
-COPY docker/patches /opt/scout/docker/patches
 COPY docker/common/fetch_third_party.py /usr/local/bin/
-RUN fetch_third_party.py /opt/scout/docker/third_party.repos src vision_msgs scout_ros \
+COPY docker/pins/vision_msgs.* docker/pins/scout_ros.* /opt/scout/pins/
+RUN fetch_third_party.py /opt/scout/pins src vision_msgs scout_ros \
  && find src/scout_ros -mindepth 1 -maxdepth 1 -type d ! -name scout_msgs -exec rm -rf {} +   # only the messages
 COPY detection_ws/src/rs_object_detection/package.xml detection_ws/src/rs_object_detection/CMakeLists.txt src/rs_object_detection/
 COPY detection_ws/src/rs_object_detection/msg src/rs_object_detection/msg

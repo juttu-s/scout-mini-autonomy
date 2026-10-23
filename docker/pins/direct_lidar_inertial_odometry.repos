@@ -1,0 +1,6 @@
+repositories:
+  direct_lidar_inertial_odometry:
+    type: git
+    url: https://github.com/vectr-ucla/direct_lidar_inertial_odometry.git
+    version: fc8d183f18cdcfb9bb4fc754c6d373cedc4cbd04
+    patch: direct_lidar_inertial_odometry.patch

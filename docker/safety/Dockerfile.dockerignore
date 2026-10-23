@@ -1,7 +1,6 @@
 # whitelist: only what safety/Dockerfile copies
 *
-!docker/third_party.repos
-!docker/patches
+!docker/pins
 !docker/common
 !docker/launch
 !detection_ws/src/rs_object_detection/package.xml

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Clone third-party sources at the commits pinned in third_party.repos and apply the local patches.
+"""Clone third-party sources at their pinned commits and apply the local patches.
 
-    fetch_third_party.py <third_party.repos> <dest_dir> <name> [<name> ...]
+    fetch_third_party.py <pins_dir> <dest_dir> <name> [<name> ...]
 
-Used inside the Dockerfiles, so an image is built from upstream + patches only (never from files on the Orin).
-Fetches just the pinned commit (shallow), fails loudly if a commit or patch does not apply.
+Reads <pins_dir>/<name>.repos (URL + commit) and applies <pins_dir>/<name>.patch if the pin names one. Used inside
+the Dockerfiles, so an image is built from upstream + patches only (never from files on the Orin). Fetches just
+the pinned commit (shallow) and fails loudly if a commit or patch does not apply.
 """
 import os
 import subprocess
@@ -18,11 +19,9 @@ def run(*cmd, cwd=None):
 
 
 def main():
-    repos_file, dest, names = sys.argv[1], sys.argv[2], sys.argv[3:]
-    repos = yaml.safe_load(open(repos_file))["repositories"]
-    base = os.path.dirname(os.path.abspath(repos_file))
+    pins, dest, names = sys.argv[1], sys.argv[2], sys.argv[3:]
     for name in names:
-        r = repos[name]
+        r = yaml.safe_load(open(os.path.join(pins, name + ".repos")))["repositories"][name]
         d = os.path.join(dest, name)
         os.makedirs(d, exist_ok=True)
         run("git", "init", "-q", cwd=d)
@@ -32,7 +31,7 @@ def main():
         if os.path.exists(os.path.join(d, ".gitmodules")):
             run("git", "submodule", "update", "-q", "--init", "--recursive", "--depth", "1", cwd=d)
         if r.get("patch"):
-            run("git", "apply", "--whitespace=nowarn", os.path.join(base, r["patch"]), cwd=d)
+            run("git", "apply", "--whitespace=nowarn", os.path.join(os.path.abspath(pins), r["patch"]), cwd=d)
         print("%s @ %s%s" % (name, r["version"][:9], " + " + r["patch"] if r.get("patch") else ""), flush=True)
 
 

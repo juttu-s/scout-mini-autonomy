@@ -1,0 +1,5 @@
+repositories:
+  vision_opencv:
+    type: git
+    url: https://github.com/ros-perception/vision_opencv.git
+    version: cfabf72fb02970a661b5e68fbee503c5d9f94729

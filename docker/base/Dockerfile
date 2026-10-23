@@ -10,17 +10,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       can-utils iproute2 \
  && rm -rf /var/lib/apt/lists/*
 
-COPY docker/third_party.repos /opt/scout/docker/
-COPY docker/patches /opt/scout/docker/patches
 COPY docker/common/fetch_third_party.py /usr/local/bin/
 
 # Livox SDK2 (shared library used by livox_ros_driver2)
-RUN fetch_third_party.py /opt/scout/docker/third_party.repos /opt/src Livox-SDK2 \
+COPY docker/pins/Livox-SDK2.* /opt/scout/pins/
+RUN fetch_third_party.py /opt/scout/pins /opt/src Livox-SDK2 \
  && cmake -S /opt/src/Livox-SDK2 -B /tmp/livox-build -DCMAKE_BUILD_TYPE=Release \
  && make -C /tmp/livox-build -j"$(nproc)" install && ldconfig && rm -rf /tmp/livox-build
 
 WORKDIR /opt/scout/ws
-RUN fetch_third_party.py /opt/scout/docker/third_party.repos src \
+COPY docker/pins/scout_ros.* docker/pins/ugv_sdk.* docker/pins/livox_ros_driver2.* docker/pins/direct_lidar_inertial_odometry.* docker/pins/ndt_omp.* docker/pins/fast_gicp.* docker/pins/hdl_localization.* docker/pins/hdl_global_localization.* /opt/scout/pins/
+RUN fetch_third_party.py /opt/scout/pins src \
       scout_ros ugv_sdk livox_ros_driver2 direct_lidar_inertial_odometry \
       ndt_omp fast_gicp hdl_localization hdl_global_localization \
  && cp src/livox_ros_driver2/package_ROS1.xml src/livox_ros_driver2/package.xml

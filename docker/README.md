@@ -52,10 +52,12 @@ TAG=20261022-abc1234 ~/robot_up.sh    # roll back to an older build (docker imag
 - **`restart: unless-stopped`, not `on-failure`.** When a `required` node dies, roslaunch shuts down and exits
   with code **0**: a killed `safety_node.py` left its container exited, never restarted (tested 2026-10-23). Docker
   backs off between restarts, and `docker compose stop` / `docker kill` count as manual stops and aren't restarted.
-- **Reproducible images.** Third-party code is cloned at the commits in `third_party.repos`, with this machine's
-  local changes applied from `patches/`. Wheels are checked by SHA-256 against the ones in the host venv, and the
-  Python packages are pinned (`perception/requirements.txt`). Run `sync_third_party.sh` after changing a
-  third-party package, then commit. Images are tagged `<date>-<git commit>`.
+- **Reproducible images.** Third-party code is cloned at the commits pinned in `pins/<name>.repos`, with this
+  machine's local changes applied from `pins/<name>.patch` (`third_party.repos` is the same information in one
+  file, for reading). Each Dockerfile step copies only the pins it uses, so changing one package rebuilds only the
+  layers after it, not the hour-long librealsense build. Wheels are checked by SHA-256 against the ones in the
+  host venv, and the Python packages are pinned (`perception/requirements.txt`). Run `sync_third_party.sh` after
+  changing a third-party package, then commit. Images are tagged `<date>-<git commit>`.
 
 ## Failure behaviour
 

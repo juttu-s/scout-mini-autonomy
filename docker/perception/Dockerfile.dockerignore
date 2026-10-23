@@ -1,6 +1,5 @@
 *
-!docker/third_party.repos
-!docker/patches
+!docker/pins
 !docker/common
 !docker/launch
 !docker/perception/requirements.txt

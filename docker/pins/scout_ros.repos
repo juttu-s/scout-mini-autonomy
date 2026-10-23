@@ -1,0 +1,5 @@
+repositories:
+  scout_ros:
+    type: git
+    url: https://github.com/agilexrobotics/scout_ros.git
+    version: 01e07881cdc566c3a657e288c59a75577992d13e

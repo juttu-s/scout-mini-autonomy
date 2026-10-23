@@ -1,0 +1,5 @@
+repositories:
+  hdl_global_localization:
+    type: git
+    url: https://github.com/koide3/hdl_global_localization.git
+    version: a6a6b69929ac371d9531d0dcdef3c1593fd49245

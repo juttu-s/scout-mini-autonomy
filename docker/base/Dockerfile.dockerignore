@@ -1,6 +1,5 @@
 *
-!docker/third_party.repos
-!docker/patches
+!docker/pins
 !docker/common
 !docker/launch
 !nav_ws/src/scout_nav

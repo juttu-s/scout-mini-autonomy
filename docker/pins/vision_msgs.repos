@@ -1,0 +1,5 @@
+repositories:
+  vision_msgs:
+    type: git
+    url: https://github.com/ros-perception/vision_msgs.git
+    version: 0c916da414830456bd7d011af08ba150d1dc5627

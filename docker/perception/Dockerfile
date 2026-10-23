@@ -26,16 +26,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl gnupg2 lsb
 # runtime) are needed to build librealsense (CUDA) and torchvision's CUDA ops
 ENV CUDACXX=/usr/local/cuda-11.4/bin/nvcc CUDA_HOME=/usr/local/cuda-11.4
 
-COPY docker/third_party.repos /opt/scout/docker/
-COPY docker/patches /opt/scout/docker/patches
 COPY docker/common/fetch_third_party.py /usr/local/bin/
 
 # librealsense 2.57.5 from source, CUDA on, kernel (V4L) backend: as built on the host (~40-60 min, own layer)
-RUN fetch_third_party.py /opt/scout/docker/third_party.repos /opt/src librealsense \
+COPY docker/pins/librealsense.* /opt/scout/pins/
+RUN fetch_third_party.py /opt/scout/pins /opt/src librealsense \
  && cmake -S /opt/src/librealsense -B /tmp/rs-build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_CUDA=ON \
       -DFORCE_RSUSB_BACKEND=OFF -DBUILD_EXAMPLES=OFF -DBUILD_GRAPHICAL_EXAMPLES=OFF -DBUILD_TOOLS=OFF \
       -DBUILD_UNIT_TESTS=OFF -DCMAKE_CUDA_ARCHITECTURES=87 \
  && make -C /tmp/rs-build -j"$(nproc)" install && ldconfig && rm -rf /tmp/rs-build /opt/src/librealsense
+
+# torch's own shared-library deps (from ldd of the host venv's torch; cuDNN and libgomp are already in the image).
+# Own layer, so the cached librealsense build above is kept.
+RUN apt-get update && apt-get install -y --no-install-recommends libopenblas0-pthread libgfortran5 libnuma1 \
+ && rm -rf /var/lib/apt/lists/*
 
 # PyTorch for JetPack 5.1 (NVIDIA wheel, checksum = the one in the host venv) + torchvision 0.15.1 from source
 ARG TORCH_WHL=torch-2.0.0a0+8aa34602.nv23.03-cp38-cp38-linux_aarch64.whl
@@ -43,9 +47,15 @@ ARG TORCH_SHA256=d7e5f1b23d443ce3ee306d2eedc8bb5773cca64f762925d098c1cbceca69964
 RUN curl -sSLo /tmp/$TORCH_WHL "https://developer.download.nvidia.com/compute/redist/jp/v51/pytorch/${TORCH_WHL/+/%2B}" \
  && echo "$TORCH_SHA256  /tmp/$TORCH_WHL" | sha256sum -c - \
  && pip3 install --no-cache-dir --no-deps /tmp/$TORCH_WHL && rm /tmp/$TORCH_WHL
+# pinned Python packages (torch's own deps included: filelock, networkx, sympy, typing-extensions); before
+# torchvision, whose build imports torch
+COPY docker/perception/requirements.txt /tmp/
+RUN pip3 install --no-cache-dir --no-deps -r /tmp/requirements.txt
+# torch 2.0's extension builder doesn't know sm_87 (Orin): build sm_86 + PTX, which runs on 8.7 and is what the
+# host venv's torchvision contains (cuobjdump: _C.*.sm_86.cubin + .ptx)
 ARG TORCHVISION_COMMIT=42759b1cc82bed60481c2802811595833e2ddd9b
 RUN git clone -q https://github.com/pytorch/vision /tmp/vision && cd /tmp/vision && git checkout -q $TORCHVISION_COMMIT \
- && FORCE_CUDA=1 TORCH_CUDA_ARCH_LIST=8.7 BUILD_VERSION=0.15.1 MAX_JOBS="$(nproc)" pip3 install --no-cache-dir --no-deps --no-build-isolation . \
+ && FORCE_CUDA=1 TORCH_CUDA_ARCH_LIST="8.6+PTX" BUILD_VERSION=0.15.1 MAX_JOBS="$(nproc)" pip3 install --no-cache-dir --no-deps --no-build-isolation . \
  && cd / && rm -rf /tmp/vision
 
 # DeepStream Python bindings 1.1.8 (checksum = the one in the host venv)
@@ -55,13 +65,18 @@ RUN curl -sSLo /tmp/pyds-1.1.8-py3-none-linux_aarch64.whl \
  && echo "$PYDS_SHA256  /tmp/pyds-1.1.8-py3-none-linux_aarch64.whl" | sha256sum -c - \
  && pip3 install --no-cache-dir --no-deps /tmp/pyds-1.1.8-py3-none-linux_aarch64.whl && rm /tmp/pyds-*.whl
 
-COPY docker/perception/requirements.txt /tmp/
-RUN pip3 install --no-cache-dir --no-deps -r /tmp/requirements.txt \
- && python3 -c "import torch, torchvision, ultralytics, pyds, tensorrt"   # import check (no GPU at build time)
+# import check without GPU. pyds and tensorrt are checked at run time instead: they link libnvbufsurface,
+# libnvdla_compiler etc., Jetson host libraries
+# that the NVIDIA container runtime mounts into a running container only
+RUN python3 -c "import torch, torchvision, ultralytics"
 
 # ROS workspace: vision_msgs + realsense-ros (pinned), rs_object_detection (incl. models: engines, custom parser)
 WORKDIR /opt/scout/ws
-RUN fetch_third_party.py /opt/scout/docker/third_party.repos src vision_msgs realsense-ros
+# vision_opencv (cv_bridge) from source, as on the host: the image has NVIDIA's OpenCV 4.5.4 dev headers next to
+# Ubuntu's 4.2 runtime that apt's cv_bridge links; realsense2_camera built against 4.5 headers + apt cv_bridge
+# died with "undefined symbol: _ZN2cv3MatC1Ev" (cv::Mat::Mat())
+COPY docker/pins/vision_msgs.* docker/pins/realsense-ros.* docker/pins/vision_opencv.* /opt/scout/pins/
+RUN fetch_third_party.py /opt/scout/pins src vision_msgs realsense-ros vision_opencv
 RUN rosdep init 2>/dev/null; rosdep update --rosdistro noetic && apt-get update \
  && rosdep install --from-paths src --ignore-src -r -y --rosdistro noetic --skip-keys "librealsense2" \
  && rm -rf /var/lib/apt/lists/*
