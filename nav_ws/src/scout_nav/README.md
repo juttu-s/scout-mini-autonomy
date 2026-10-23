@@ -10,6 +10,10 @@ Navigation for the Scout Mini on flat indoor floors, using a **3D lidar map**:
 | Planning | `move_base`: static layer (the grid) + **3D voxel layer** (live MID360 cloud + D455 depth cloud) + inflation; GlobalPlanner + DWA |
 | Output | `/nav/cmd_vel` → `scout_safety` (slows or stops for people; teleop overrides) → `/cmd_vel` → Scout |
 
+## Evaluation
+Repeatable goal circuit with one CSV row per attempt (appended across sessions): `scripts/eval_nav_goals.py` with
+`config/nav_eval_goals_lab2.yaml`. Setup, goals and safety rules: [`docs/nav_eval_protocol.md`](docs/nav_eval_protocol.md).
+
 ## Frames
 `map` (hdl_localization) → `odom` (DLIO) → `base_link` (**= the MID360 lidar**, DLIO's `baselink2lidar` is identity) →
 `livox_frame` (identity, static) and `camera_link` (the mount set in `robot.launch`).

@@ -1,0 +1,16 @@
+# Navigation evaluation circuit on lab2 (eval_nav_goals.py; protocol: scout_nav/docs/nav_eval_protocol.md).
+# Chosen from the static lab2 map, 2026-10-23: clearance at every goal >= 0.54 m, every leg routable for the robot's
+# 0.31 m inscribed radius. Each yaw faces the next goal (natural arrival heading, little turning before leaving).
+# A lap: home -> A ... F -> home, ~42 m driven. Don't edit a goal without re-surveying it and noting it in the
+# protocol: CSV rows are compared across sessions by goal name.
+map: lab2
+frame: map
+start: home
+goals:
+  - {name: home,        x: -0.22, y:  0.28, yaw_deg:   60}   # start mark; clearance 0.65 m
+  - {name: A_aisle_mid, x:  2.65, y:  5.32, yaw_deg:   68}   # 0.75 m
+  - {name: B_north,     x:  4.70, y: 10.31, yaw_deg: -179}   # 1.05 m
+  - {name: C_north_w,   x:  3.59, y: 10.30, yaw_deg:  -87}   # 1.10 m
+  - {name: D_east_mid,  x:  3.93, y:  2.83, yaw_deg:  -79}   # 0.54 m; the leg C -> D has 0.35 m at its narrowest
+  - {name: E_south,     x:  5.31, y: -4.13, yaw_deg: -173}   # 0.60 m
+  - {name: F_sw,        x:  4.32, y: -4.26, yaw_deg:  135}   # 1.07 m
