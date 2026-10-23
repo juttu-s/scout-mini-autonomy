@@ -129,6 +129,11 @@ fresh container spent about 2 minutes JIT-compiling PTX before its first detecti
 `~/.nv/ComputeCache`. That folder is now the named volume `scout_cuda_cache`. A fresh perception container reaches
 full rate in **21 s instead of 139 s**; only the first start after an image change pays the compile again.
 
+**Recording in containers, tested 2026-10-23.** `~/robot_exec.sh base rosrun scout_nav record_nav.sh lab2` with
+navigation running wrote to `~/bags/lab2/nav_runs/<date_time>/`, files owned by `agile`. `~/robot_down.sh` found
+the recording, sent SIGINT and waited for it to close (about 12 s), then stopped the containers in reverse order:
+20 s in total. Result: `nav_0.bag`, 79 s, 618 MB, 60,893 messages, no `.active` file, `rosbag info` reads it.
+
 ## Test checklist (wheels off the ground for all of it until every item has passed)
 1. `build.sh` succeeds. In perception: `python3 -c "import torch, pyds, ultralytics; print(torch.cuda.is_available())"` prints `True`.
 2. `robot_up.sh`, then check:
