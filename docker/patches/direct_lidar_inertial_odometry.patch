@@ -1,3 +1,18 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 91e47a0..a75047b 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -99,6 +99,10 @@ add_library(nano_gicp STATIC
+   src/nano_gicp/nano_gicp.cc
+ )
+ target_link_libraries(nano_gicp ${PCL_LIBRARIES} ${OpenMP_LIBS} nanoflann)
++# both libraries include dlio.h, which needs the generated save_pcd.h: without this, a parallel build can
++# compile them before the service header exists
++add_dependencies(nanoflann ${PROJECT_NAME}_generate_messages_cpp)
++add_dependencies(nano_gicp ${PROJECT_NAME}_generate_messages_cpp)
+ 
+ # Odometry Node
+ add_executable(dlio_odom_node src/dlio/odom_node.cc src/dlio/odom.cc)
 diff --git a/cfg/dlio.yaml b/cfg/dlio.yaml
 index 9cebbe2..75e9fde 100644
 --- a/cfg/dlio.yaml

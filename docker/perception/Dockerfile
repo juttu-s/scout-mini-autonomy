@@ -20,14 +20,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl gnupg2 lsb
       python3-gi python3-gst-1.0 gir1.2-gst-rtsp-server-1.0 python3-libnvinfer \
       git cmake build-essential libssl-dev libusb-1.0-0-dev libudev-dev pkg-config libgtk-3-dev \
       libjpeg-dev zlib1g-dev libpng-dev \
+      cuda-nvcc-11-4 cuda-libraries-dev-11-4 \
  && rm -rf /var/lib/apt/lists/*
+# the samples image has the CUDA runtime only; nvcc + headers (same 11.4.19 / cuBLAS 11.6.6.84 as the image's
+# runtime) are needed to build librealsense (CUDA) and torchvision's CUDA ops
+ENV CUDACXX=/usr/local/cuda-11.4/bin/nvcc CUDA_HOME=/usr/local/cuda-11.4
 
-COPY docker/third_party.repos docker/
-COPY docker/patches docker/patches
+COPY docker/third_party.repos /opt/scout/docker/
+COPY docker/patches /opt/scout/docker/patches
 COPY docker/common/fetch_third_party.py /usr/local/bin/
 
 # librealsense 2.57.5 from source, CUDA on, kernel (V4L) backend: as built on the host (~40-60 min, own layer)
-RUN fetch_third_party.py docker/third_party.repos /opt/src librealsense \
+RUN fetch_third_party.py /opt/scout/docker/third_party.repos /opt/src librealsense \
  && cmake -S /opt/src/librealsense -B /tmp/rs-build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_CUDA=ON \
       -DFORCE_RSUSB_BACKEND=OFF -DBUILD_EXAMPLES=OFF -DBUILD_GRAPHICAL_EXAMPLES=OFF -DBUILD_TOOLS=OFF \
       -DBUILD_UNIT_TESTS=OFF -DCMAKE_CUDA_ARCHITECTURES=87 \
@@ -57,7 +61,7 @@ RUN pip3 install --no-cache-dir --no-deps -r /tmp/requirements.txt \
 
 # ROS workspace: vision_msgs + realsense-ros (pinned), rs_object_detection (incl. models: engines, custom parser)
 WORKDIR /opt/scout/ws
-RUN fetch_third_party.py docker/third_party.repos src vision_msgs realsense-ros
+RUN fetch_third_party.py /opt/scout/docker/third_party.repos src vision_msgs realsense-ros
 RUN rosdep init 2>/dev/null; rosdep update --rosdistro noetic && apt-get update \
  && rosdep install --from-paths src --ignore-src -r -y --rosdistro noetic --skip-keys "librealsense2" \
  && rm -rf /var/lib/apt/lists/*

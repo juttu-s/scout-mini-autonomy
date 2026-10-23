@@ -5,9 +5,9 @@ Four containers that talk over ROS 1, split by **failure domain** rather than on
 | container | image | runs | restart |
 |---|---|---|---|
 | `master` | scout-safety | `roscore` (rosmaster + rosout) | never: ROS 1 nodes don't re-register with a new master |
-| `safety` | scout-safety (ros-core + messages, no GPU) | `safety_node.py`, the only `/cmd_vel` publisher | on-failure |
-| `perception` | scout-perception (DeepStream 6.3 L4T + ROS + torch) | RealSense driver, camera mount TF, detector | on-failure, up to 3 tries |
-| `base` | scout-base (ros-base) | Scout base (CAN), MID360, DLIO, Foxglove; with `--nav` localization + move_base | on-failure, up to 3 tries |
+| `safety` | scout-safety (ros-core + messages, no GPU) | `safety_node.py`, the only `/cmd_vel` publisher | unless-stopped |
+| `perception` | scout-perception (DeepStream 6.3 L4T + ROS + torch) | RealSense driver, camera mount TF, detector | unless-stopped |
+| `base` | scout-base (ros-base) | Scout base (CAN), MID360, DLIO, Foxglove; with `--nav` localization + move_base | unless-stopped |
 
 `robot.launch` and `navigation.launch` are unchanged, so the native stack still works as a fallback. The container
 launch files in `launch/` include the same pieces with the same defaults.
@@ -44,6 +44,14 @@ TAG=20261022-abc1234 ~/robot_up.sh    # roll back to an older build (docker imag
   admitted; it's off by default anyway (FAILURES.md F-50: it stalls the camera).
 - **Bags go to `~/bags`, a bind mount** (`BAG_ROOT`), never into a container layer. `record_session.sh` symlinks
   `~/maps/<name>/recording` to the bag folder, so the offline tools still find them.
+- **Image sizes.** scout-safety is about 2.1 GB, almost all of it the official `ros:noetic-ros-core` layers: ROS 1's
+  Debian packages pull in cmake, compilers and Boost headers through roscpp and catkin, and a hand-trimmed
+  `ubuntu:focal` + rospy/tf2 runtime came out the same size (2.11 GB, tested 2026-10-22). What keeps safety small is
+  what it doesn't contain: no CUDA, TensorRT, torch or GPU runtime. On disk, its base layers are shared with
+  scout-base (`ros-base` is built on `ros-core`), so it adds about 29 MB.
+- **`restart: unless-stopped`, not `on-failure`.** When a `required` node dies, roslaunch shuts down and exits
+  with code **0**: a killed `safety_node.py` left its container exited, never restarted (tested 2026-10-23). Docker
+  backs off between restarts, and `docker compose stop` / `docker kill` count as manual stops and aren't restarted.
 - **Reproducible images.** Third-party code is cloned at the commits in `third_party.repos`, with this machine's
   local changes applied from `patches/`. Wheels are checked by SHA-256 against the ones in the host venv, and the
   Python packages are pinned (`perception/requirements.txt`). Run `sync_third_party.sh` after changing a
@@ -71,12 +79,13 @@ wheels off the ground (PROJECT_LOG.md lists it as not done).
    - detector FPS the same as native (about 30);
    - Foxglove teleop turns the wheels;
    - safety states as before.
-3. While teleop commands motion, kill each container in turn and time it from the kill to the wheels stopping
-   (`/scout_status`):
-   - `docker kill scout-perception-1`: safety goes to FAULT within 0.3 s. After the restart, `rosnode info
+3. While teleop commands motion, crash each container's main node in turn and time it from the crash to the
+   wheels stopping (`/scout_status`). Crash means `docker exec <container> pkill -9 -f <node>`: `docker kill`
+   counts as a manual stop, so it doesn't exercise the restart path:
+   - `docker exec scout-perception-1 pkill -9 -f '[d]etector_node.py'`: safety goes to FAULT within 0.3 s. After the restart, `rosnode info
      /rs_detector` shows the new pid, `rostopic info /rs_detector/tracks` lists `/scout_safety`, and FAULT clears.
-   - `docker kill scout-base-1`: compare against the firmware test. After the restart, `/odom` is back.
-   - `docker kill scout-safety-1`: compare against the firmware test. After the restart, motion resumes only on a
+   - `docker exec scout-base-1 pkill -9 -f '[s]cout_base_node'`: compare against the firmware test. After the restart, `/odom` is back.
+   - `docker exec scout-safety-1 pkill -9 -f '[s]afety_node.py'`: compare against the firmware test. After the restart, motion resumes only on a
      fresh teleop command.
    - `docker compose stop base` during a 2-minute `record_nav.sh`: the bag is closed (no `.active` files) within
      120 s.

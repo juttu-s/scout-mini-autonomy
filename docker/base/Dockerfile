@@ -10,17 +10,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       can-utils iproute2 \
  && rm -rf /var/lib/apt/lists/*
 
-COPY docker/third_party.repos docker/
-COPY docker/patches docker/patches
+COPY docker/third_party.repos /opt/scout/docker/
+COPY docker/patches /opt/scout/docker/patches
 COPY docker/common/fetch_third_party.py /usr/local/bin/
 
 # Livox SDK2 (shared library used by livox_ros_driver2)
-RUN fetch_third_party.py docker/third_party.repos /opt/src Livox-SDK2 \
+RUN fetch_third_party.py /opt/scout/docker/third_party.repos /opt/src Livox-SDK2 \
  && cmake -S /opt/src/Livox-SDK2 -B /tmp/livox-build -DCMAKE_BUILD_TYPE=Release \
  && make -C /tmp/livox-build -j"$(nproc)" install && ldconfig && rm -rf /tmp/livox-build
 
 WORKDIR /opt/scout/ws
-RUN fetch_third_party.py docker/third_party.repos src \
+RUN fetch_third_party.py /opt/scout/docker/third_party.repos src \
       scout_ros ugv_sdk livox_ros_driver2 direct_lidar_inertial_odometry \
       ndt_omp fast_gicp hdl_localization hdl_global_localization \
  && cp src/livox_ros_driver2/package_ROS1.xml src/livox_ros_driver2/package.xml
