@@ -5,9 +5,8 @@
 
 Answers each "Route clear?" prompt with Enter while every goal so far has SUCCEEDED, and with q after the first one
 that didn't (so the robot isn't sent on from a spot it may be stuck in). Waits --start-delay s (default 10) before
-the first goal so whoever placed the robot can step back: a person right next to it is marked as an obstacle by the
-camera (the lidar is blind there) and blocked every motion, while the detector didn't see them as a person
-(lab2 home2, 2026-10-24). Only for runs the operator has explicitly
+the first goal so whoever placed the robot can step back: within 0.5 m of the camera neither the camera cloud nor
+the lidar sees anything, and the detector won't flag a person (nav_eval_protocol.md, item 7). Only for runs the operator has explicitly
 started from the robot's side, e-stop in hand: it replaces the per-goal Enter, not the operator.
 """
 import os

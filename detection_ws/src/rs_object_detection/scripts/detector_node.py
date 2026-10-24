@@ -521,7 +521,9 @@ class RealSenseDetector:
         # Decimated point cloud of the registered depth for obstacle avoidance (move_base costmaps)
         self.pub_cloud = rospy.Publisher("~depth_points", PointCloud2, queue_size=1)
         self.cloud_step = rospy.get_param("~cloud_step", 4)            # every Nth pixel in u and v
-        self.cloud_range = rospy.get_param("~cloud_range", [0.3, 3.5])  # m; D455 depth noise grows ~quadratically
+        # m; D455 depth noise grows ~quadratically. Under ~0.5 m it reads phantom patches (0.33 m with nothing there,
+        # lab2 2026-10-24), which sat on the costmap footprint and blocked every motion
+        self.cloud_range = rospy.get_param("~cloud_range", [0.5, 3.5])
         self.cloud_period = 1.0 / rospy.get_param("~cloud_rate", 10.0)
         self.cloud_last = 0.0
         # Republish the registered depth like the driver's align_depth output (camera must run align_depth:=false)

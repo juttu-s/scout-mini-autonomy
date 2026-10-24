@@ -196,11 +196,13 @@ The items marked **UNSAFE WITH PEOPLE NEARBY** are why the aisles are closed off
    - The script won't start a goal below 0.95 inliers, but localization can still slip during a goal. Watch the
      `min_inlier` column.
    - Watch Foxglove: if the scan no longer lines up with the map, e-stop.
-7. **UNSAFE WITH PEOPLE NEARBY: someone standing right next to the robot may not count as a person.**
-   - Within about 0.6 m of the camera, the detector sees only part of a person and may not recognise them, so the
-     safety node stays `OK`. Only the costmap then keeps the robot from moving into them.
-   - At that range the lidar is blind below about 0.7 m, so the camera alone marks them. On 2026-10-24 that blocked
-     every motion at home2, so nothing was hit, but nothing would have slowed the robot for that person either.
+7. **UNSAFE WITH PEOPLE NEARBY: something right next to the robot is invisible.**
+   - The camera cloud starts at 0.5 m from the camera (0.68 m ahead of the turning centre). Closer than that, the D455
+     reads garbage: on 2026-10-24 it reported a fixed patch at 0.33 m, 0.6-0.7 m above the floor, in most frames with
+     nothing there (the person in view was ~6 m away). Those phantom points sat on the footprint and blocked every
+     motion at home2, which is why the camera now drops everything under 0.5 m.
+   - At that range the lidar is blind below about 0.7 m too, so neither sensor marks a person, leg or desk edge right
+     at the front, and the detector won't see a person that close either: the safety node stays `OK`.
    - Step at least 1 m away before a goal starts. `run_circuit.py` waits 10 s before its first goal for this.
 8. **Invisible obstacles.**
    - The costmap ignores anything lower than 8 cm (lidar) or 10 cm (camera), and glass. Cables, bags, a foot at floor
