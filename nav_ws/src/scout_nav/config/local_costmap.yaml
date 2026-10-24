@@ -10,5 +10,7 @@ local_costmap:
     - {name: obstacle_layer, type: "costmap_2d::VoxelLayer"}
     - {name: inflation_layer, type: "costmap_2d::InflationLayer"}
   inflation_layer:
-    inflation_radius: 0.4
-    cost_scaling_factor: 3.5
+    # 0.7 / 3.0 like the global costmap: at 0.4 / 3.5 the cost gradient beyond the inscribed band was ~9 cm wide, so
+    # DWA's obstacle term barely pushed back and it drove the centre to 0.10 m of a desk edge (lab2 home2, 2026-10-24)
+    inflation_radius: 0.7
+    cost_scaling_factor: 3.0
