@@ -50,14 +50,14 @@ DWAPlannerROS:
   xy_goal_tolerance: 0.35
   yaw_goal_tolerance: 0.5    # rad (~29 deg)
   latch_xy_goal_tolerance: true
-  sim_time: 2.0
+  sim_time: 1.5              # 2.0 cut S-bends diagonally: 0.3 m inside the plan into a desk corner (lab2, 2026-10-23)
   sim_granularity: 0.025
   vx_samples: 15
   vy_samples: 1
   vth_samples: 30
   twirling_scale: 0.0
-  path_distance_bias: 32.0   # follow the (centred) global plan more than heading for the goal: 24/24 cut corners
-  goal_distance_bias: 20.0
+  path_distance_bias: 48.0   # follow the global plan closely: 24/24 and 32/20 still cut bends (lab2 A -> B, 2026-10-23)
+  goal_distance_bias: 16.0
   oscillation_reset_dist: 0.05
   prune_plan: true
   occdist_scale: 0.05        # keep off the inflated band (0.02 let DWA hug desk corners into it)
