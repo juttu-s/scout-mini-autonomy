@@ -196,12 +196,18 @@ The items marked **UNSAFE WITH PEOPLE NEARBY** are why the aisles are closed off
    - The script won't start a goal below 0.95 inliers, but localization can still slip during a goal. Watch the
      `min_inlier` column.
    - Watch Foxglove: if the scan no longer lines up with the map, e-stop.
-7. **Invisible obstacles.**
+7. **UNSAFE WITH PEOPLE NEARBY: someone standing right next to the robot may not count as a person.**
+   - Within about 0.6 m of the camera, the detector sees only part of a person and may not recognise them, so the
+     safety node stays `OK`. Only the costmap then keeps the robot from moving into them.
+   - At that range the lidar is blind below about 0.7 m, so the camera alone marks them. On 2026-10-24 that blocked
+     every motion at home2, so nothing was hit, but nothing would have slowed the robot for that person either.
+   - Step at least 1 m away before a goal starts. `run_circuit.py` waits 10 s before its first goal for this.
+8. **Invisible obstacles.**
    - The costmap ignores anything lower than 8 cm (lidar) or 10 cm (camera), and glass. Cables, bags, a foot at floor
      level, or a pet won't be seen.
    - The camera's person detection covers people standing in front, not someone sitting or lying on the floor.
-8. **The RC handset outranks the computer.** In RC mode the base ignores `/cmd_vel`, so the safety node can't stop the
+9. **The RC handset outranks the computer.** In RC mode the base ignores `/cmd_vel`, so the safety node can't stop the
    robot. Use the handset or the e-stop, not the laptop.
-9. **Not unsafe, but it makes results noisy:**
+10. **Not unsafe, but it makes results noisy:**
    - stale or unmapped obstacles can block a route mid-goal (aborts, not collisions);
    - people moving through the camera view cause SLOW/STOP (see the `safety_*` columns).
