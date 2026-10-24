@@ -15,8 +15,12 @@ Repeatable goal circuit with one CSV row per attempt (appended across sessions):
 `config/nav_eval_goals_lab2.yaml`. Setup, goals and safety rules: [`docs/nav_eval_protocol.md`](docs/nav_eval_protocol.md).
 
 ## Frames
-`map` (hdl_localization) → `odom` (DLIO) → `base_link` (**= the MID360 lidar**, DLIO's `baselink2lidar` is identity) →
-`livox_frame` (identity, static) and `camera_link` (the mount set in `robot.launch`).
+`map` (hdl_localization) → `odom` (DLIO) → `base_link` (**the Scout's turning centre**, at lidar height) →
+`livox_frame` (the MID360, 0.178 m straight ahead: static in `robot.launch` / `base.launch`, and DLIO's
+`baselink2lidar`) and `camera_link` (the mount in `robot.launch`, also 0.178 m ahead).
+Until 2026-10-23 `base_link` was the lidar itself. Every turn in place then swung it round a 0.18 m circle, and the
+footprint sat 0.18 m too far forward. Sessions recorded before then (lab2) have no `base_link → livox_frame` in their
+`/tf_static`; the map tools treat that as identity.
 The map frame is DLIO's odom frame from the mapping run: its origin is where the robot was when mapping started, with
 z = 0 at lidar height.
 

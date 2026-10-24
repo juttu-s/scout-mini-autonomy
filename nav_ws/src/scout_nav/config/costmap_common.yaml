@@ -1,5 +1,6 @@
-# Shared by global and local costmaps. base_link is DLIO's base_link = the MID360 lidar.
-# Footprint: Scout Mini 0.612 x 0.580 m, assuming the lidar sits over the robot's centre. MEASURE and adjust.
+# Shared by global and local costmaps. base_link = the Scout's turning centre (DLIO baselink2lidar: the MID360 is 0.178 m
+# straight ahead of it). Footprint: Scout Mini 0.612 x 0.580 m, centred on the turning centre. (Until 2026-10-23
+# base_link was the lidar, so this footprint sat 0.18 m too far forward and the rear wasn't collision-checked.)
 footprint: [[0.31, 0.29], [0.31, -0.29], [-0.31, -0.29], [-0.31, 0.29]]
 footprint_padding: 0.02
 robot_base_frame: base_link

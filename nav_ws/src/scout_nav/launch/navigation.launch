@@ -17,8 +17,8 @@
     <arg name="foxglove" value="$(arg foxglove)"/>
   </include>
 
-  <!-- The MID360 cloud is in livox_frame; DLIO uses the lidar as base_link (baselink2lidar = identity). -->
-  <node pkg="tf2_ros" type="static_transform_publisher" name="base_to_livox" args="0 0 0 0 0 0 base_link livox_frame"/>
+  <!-- base_link -> livox_frame (the MID360, 0.178 m ahead of the turning centre) comes from robot.launch, or from
+       base.launch in the containers. -->
 
   <!-- The Livox driver outputs (0,0,0) for beams with no return (~18 % of a MID360 scan). Inside the obstacle height
        band they would mark the robot's own cell lethal, so drop everything within +-0.4 m of the lidar

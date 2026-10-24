@@ -11,4 +11,9 @@
   <!-- params.yaml has waitUntilMove: true, which holds back the per-scan deskewed cloud (the latency probe's
        output) until the robot has moved; odometry is unaffected. -->
   <param name="/dlio_odom/dlio/map/waitUntilMove" value="false"/>
+  <!-- The comparison defines base_link = the MID360 for every method (common.launch, recorded bags). The robot's DLIO
+       config moved base_link to the turning centre on 2026-10-23 (baselink2lidar 0.178 m); keep the lidar-frame
+       extrinsics here so DLIO stays comparable with the other methods and with earlier results. -->
+  <rosparam param="/dlio_odom/dlio/extrinsics/baselink2lidar/t">[0.0, 0.0, 0.0]</rosparam>
+  <rosparam param="/dlio_odom/dlio/extrinsics/baselink2imu/t">[-0.042382, -0.019593, 0.020312]</rosparam>
 </launch>

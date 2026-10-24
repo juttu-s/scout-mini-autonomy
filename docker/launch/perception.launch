@@ -3,7 +3,7 @@
        base_link -> camera_link mount, detector (DeepStream backend by default). Same args and defaults as
        robot.launch; keep the camera mount below in step with it. The venv's packages are installed system-wide
        in the image, so the detector runs under /usr/bin/python3. -->
-  <arg name="cam_x"     default="0.30"/>    <!-- PLACEHOLDER: measure camera centre ahead of the MID360 centre -->
+  <arg name="cam_x"     default="0.178"/>   <!-- measured: 7 in ahead of the turning centre (= base_link) -->
   <arg name="cam_y"     default="0.0"/>
   <arg name="cam_z"     default="-0.225"/>
   <arg name="cam_yaw"   default="0.0"/>

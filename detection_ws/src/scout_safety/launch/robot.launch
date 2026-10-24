@@ -5,8 +5,8 @@
          teleop:      rosrun teleop_twist_keyboard teleop_twist_keyboard.py cmd_vel:=/teleop/cmd_vel
          navigation:  remap the planner's cmd_vel to /nav/cmd_vel -->
 
-  <!-- Camera mount: base_link -> camera_link. MEASURE these (metres / radians); placeholders below. -->
-  <arg name="cam_x"     default="0.30"/>    <!-- PLACEHOLDER: measure camera centre ahead of the MID360 centre -->
+  <!-- Camera mount: base_link (the Scout's turning centre, at lidar height) -> camera_link (metres / radians). -->
+  <arg name="cam_x"     default="0.178"/>   <!-- measured: camera 7 in ahead of the turning centre (= base_link), no lateral offset -->
   <arg name="cam_y"     default="0.0"/>
   <arg name="cam_z"     default="-0.225"/>  <!-- estimated from the floor 2026-10-17: camera 0.535 m above floor, lidar 0.76 m -->
   <arg name="cam_yaw"   default="0.0"/>
@@ -24,6 +24,9 @@
   <group if="$(arg robot)">
     <include file="$(find scout_bringup)/launch/scout_robot_base.launch"/>
     <include file="$(find livox_ros_driver2)/launch_ROS1/msg_MID360.launch"/>
+    <!-- base_link is the turning centre; the MID360 sits 7 in (0.178 m) straight ahead of it, same height. Keep in step
+         with DLIO's baselink2lidar (dlio_ws cfg/dlio.yaml). Recorded in bags, so offline tools read it from /tf_static. -->
+    <node pkg="tf2_ros" type="static_transform_publisher" name="base_to_livox" args="0.178 0 0 0 0 0 base_link livox_frame"/>
     <include file="$(find direct_lidar_inertial_odometry)/launch/dlio.launch">
       <arg name="pointcloud_topic" value="/livox/lidar"/>
       <arg name="imu_topic"        value="/livox/imu"/>

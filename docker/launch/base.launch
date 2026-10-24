@@ -12,6 +12,8 @@
 
   <include file="$(find scout_bringup)/launch/scout_robot_base.launch"/>
   <include file="$(find livox_ros_driver2)/launch_ROS1/msg_MID360.launch"/>
+  <!-- base_link = turning centre; MID360 0.178 m straight ahead (as robot.launch; keep in step with DLIO baselink2lidar) -->
+  <node pkg="tf2_ros" type="static_transform_publisher" name="base_to_livox" args="0.178 0 0 0 0 0 base_link livox_frame"/>
   <include file="$(find direct_lidar_inertial_odometry)/launch/dlio.launch">
     <arg name="pointcloud_topic" value="/livox/lidar"/>
     <arg name="imu_topic"        value="/livox/imu"/>

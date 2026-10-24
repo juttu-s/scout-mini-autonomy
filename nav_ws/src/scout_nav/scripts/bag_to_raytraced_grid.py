@@ -24,7 +24,7 @@ import numpy as np
 import rosbag
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
-from bag_to_dense_map import ODOM, LIDAR, quat_to_rot, slerp, xyz_from_cloud  # noqa: E402
+from bag_to_dense_map import ODOM, LIDAR, lidar_extrinsic, quat_to_rot, slerp, xyz_from_cloud  # noqa: E402
 
 
 def main():
@@ -52,6 +52,7 @@ def main():
     bags = sorted(glob.glob(os.path.join(d, "recording", "*.bag")),
                   key=lambda p: int(p.rsplit("_", 1)[1].split(".")[0]))
 
+    Rl, tl = lidar_extrinsic(bags)  # livox_frame in base_link (identity for sessions where base_link was the lidar)
     t, P, Q = [], [], []
     for b in bags:
         with rosbag.Bag(b) as bag:
@@ -87,7 +88,8 @@ def main():
                 p = xyz_from_cloud(m)
                 r = np.linalg.norm(p, axis=1)
                 p = p[(r > a.min_range) & (r < a.max_range)]
-                w = p @ R.T + pos
+                pos = pos + R @ tl              # rays start at the lidar, not at base_link
+                w = (p @ Rl.T + tl) @ R.T + (pos - R @ tl)
                 w = w[(w[:, 2] > lo) & (w[:, 2] < hi)]
                 if len(w) > a.rays:
                     w = w[rng.choice(len(w), a.rays, replace=False)]

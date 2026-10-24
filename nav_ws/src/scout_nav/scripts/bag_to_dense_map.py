@@ -55,6 +55,23 @@ def xyz_from_cloud(msg):
     return np.stack([a["x"], a["y"], a["z"]], 1).astype(np.float64)
 
 
+def lidar_extrinsic(bags):
+    """(R, t) of livox_frame in base_link from the recording's /tf_static, identity if it isn't there.
+
+    Older sessions (e.g. lab2, 2026-10-18) used the lidar itself as base_link and recorded no such transform. Since
+    2026-10-23 base_link is the turning centre and robot.launch publishes base_link -> livox_frame (0.178 m ahead), so
+    DLIO's poses are the centre's and every scan must be shifted by this before placing it in the map.
+    """
+    for b in bags[:1]:
+        with rosbag.Bag(b) as bag:
+            for _, m, _ in bag.read_messages(topics=["/tf_static"]):
+                for tr in m.transforms:
+                    if tr.header.frame_id.lstrip("/") == "base_link" and tr.child_frame_id.lstrip("/") == "livox_frame":
+                        q, v = tr.transform.rotation, tr.transform.translation
+                        return quat_to_rot((q.x, q.y, q.z, q.w)), np.array([v.x, v.y, v.z])
+    return np.eye(3), np.zeros(3)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("session_dir")
@@ -76,7 +93,10 @@ def main():
     if not bags:
         sys.exit("no bags in %s/recording" % d)
 
-    # pass 1: DLIO poses (base_link = lidar, in DLIO's odom frame = the saved map frame)
+    Rl, tl = lidar_extrinsic(bags)
+    print("lidar in base_link: t = %s%s" % (np.round(tl, 3), "" if tl.any() else " (base_link = lidar)"))
+
+    # pass 1: DLIO poses (base_link, in DLIO's odom frame = the saved map frame)
     t, P, Q = [], [], []
     for b in bags:
         with rosbag.Bag(b) as bag:
@@ -116,7 +136,7 @@ def main():
                 p = xyz_from_cloud(m)
                 r = np.linalg.norm(p, axis=1)
                 p = p[(r > a.min_range) & (r < a.max_range)]
-                w = p @ R.T + pos
+                w = (p @ Rl.T + tl) @ R.T + pos
                 k = np.floor(w / a.voxel).astype(np.int64) + off
                 pending.append((k[:, 0] << 42) | (k[:, 1] << 21) | k[:, 2])
                 n_scans += 1

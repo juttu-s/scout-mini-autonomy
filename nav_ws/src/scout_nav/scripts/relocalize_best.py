@@ -17,10 +17,32 @@ from hdl_global_localization.srv import QueryGlobalLocalization
 from hdl_localization.msg import ScanMatchingStatus
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import PointCloud2
+import tf2_ros
+from sensor_msgs.msg import PointField
+from tf.transformations import quaternion_matrix
 
 
 def yaw_of(q):
     return np.arctan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y ** 2 + q.z ** 2))
+
+
+def to_frame(cloud, tr):
+    """The cloud's x, y, z moved into tr's target frame (plain xyz cloud; the global search uses nothing else)."""
+    o = {f.name: f.offset for f in cloud.fields}
+    a = np.frombuffer(cloud.data, np.dtype({"names": list("xyz"), "formats": ["<f4"] * 3,
+                                            "offsets": [o[k] for k in "xyz"], "itemsize": cloud.point_step}),
+                      count=cloud.width * cloud.height)
+    p = np.stack([a[k] for k in "xyz"], 1).astype(np.float64)
+    q, v = tr.transform.rotation, tr.transform.translation
+    T = quaternion_matrix([q.x, q.y, q.z, q.w])
+    p = (p @ T[:3, :3].T + [v.x, v.y, v.z]).astype(np.float32)
+    p = p[np.isfinite(p).all(1)]
+    out = PointCloud2(header=cloud.header, height=1, width=len(p), is_bigendian=False, point_step=12,
+                      row_step=12 * len(p), is_dense=True,
+                      fields=[PointField(n, 4 * i, PointField.FLOAT32, 1) for i, n in enumerate("xyz")])
+    out.header.frame_id = tr.header.frame_id
+    out.data = p.tobytes()
+    return out
 
 
 def main():
@@ -31,7 +53,13 @@ def main():
     a = ap.parse_args(rospy.myargv()[1:])
     rospy.init_node("relocalize_best")
 
-    scan = rospy.wait_for_message(a.cloud, PointCloud2, 5)  # livox_frame = base_link (identity)
+    scan = rospy.wait_for_message(a.cloud, PointCloud2, 5)
+    # the search returns the pose of the cloud's frame: give it the cloud in base_link (the turning centre; the MID360
+    # is 0.178 m ahead of it), so the candidates are base_link poses like /initialpose expects
+    buf = tf2_ros.Buffer()
+    tf2_ros.TransformListener(buf)
+    tr = buf.lookup_transform("base_link", scan.header.frame_id, rospy.Time(0), rospy.Duration(3))
+    scan = to_frame(scan, tr)
     query = rospy.ServiceProxy("/hdl_global_localization/query", QueryGlobalLocalization)
     query.wait_for_service(10)
     res = query(max_num_candidates=a.candidates, cloud=scan)

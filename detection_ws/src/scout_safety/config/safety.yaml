@@ -16,7 +16,8 @@ max_reverse_speed: 0.2
 max_angular: 1.0
 min_slow_speed: 0.1        # slowest speed in the slow zone (above 0 so the robot can still creep)
 
-# Geometry (MEASURE on the robot): base_link origin to front bumper, half the body width
+# Geometry: base_link (the turning centre; the lidar and camera are 0.178 m ahead of it) to the front bumper, and
+# half the body width
 front_offset: 0.31
 half_width: 0.30
 lateral_margin: 0.30       # corridor = half_width + lateral_margin either side of the robot's centre line

@@ -14,15 +14,26 @@ index 91e47a0..a75047b 100644
  # Odometry Node
  add_executable(dlio_odom_node src/dlio/odom_node.cc src/dlio/odom.cc)
 diff --git a/cfg/dlio.yaml b/cfg/dlio.yaml
-index 9cebbe2..75e9fde 100644
+index 9cebbe2..5ebac3a 100644
 --- a/cfg/dlio.yaml
 +++ b/cfg/dlio.yaml
-@@ -33,7 +33,7 @@ dlio:
+@@ -31,14 +31,17 @@ dlio:
+       gyro:
+         bias: [ 0.0, 0.0, 0.0 ]
  
++  # base_link = the Scout's turning centre (2026-10-23). The MID360 is 7 in (0.178 m) straight ahead of it, at the same
++  # height, no lateral offset (measured by the user); the IMU offset below is the one measured relative to the lidar,
++  # shifted by the same 0.178 m. Before, base_link was the lidar itself: turns in place swung it round a 0.18 m circle.
    extrinsics:
      baselink2imu:
 -      t: [ 0.006253, -0.011775, 0.007645 ]
-+      t: [ -0.042382, -0.019593,   0.020312]
++      t: [ 0.135618, -0.019593,   0.020312]
+       R: [ 1.,  0.,  0.,
+            0.,  1.,  0.,
+            0.,  0.,  1. ]
+     baselink2lidar:
+-      t: [ 0.,  0.,  0. ]
++      t: [ 0.178,  0.,  0. ]
        R: [ 1.,  0.,  0.,
             0.,  1.,  0.,
             0.,  0.,  1. ]

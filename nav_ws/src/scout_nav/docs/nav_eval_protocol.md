@@ -48,7 +48,8 @@ So `path_ratio` should be near 1.1–1.4, and well above that means detours or w
    - Nobody walks next to or behind the robot except the operator (section 7, items 1–2).
 3. **Start mark:**
    - Floor tape at `home2`, map (2.08, 0.33). Put it there once by driving the robot there with localization good and
-     taping the lidar's position (the MID360 is `base_link`).
+     taping the robot's **centre**. `base_link` is the turning centre since 2026-10-23; the lidar is 0.178 m (7 in)
+     ahead of it.
    - Place the robot on the tape facing 83° in the map, i.e. towards goal A.
    - The first home, (−0.22, 0.28), was dropped: it sits in a pocket that is 0.40 m wide on the way in, and twice the
      robot couldn't finish there because it had no room to turn round.
@@ -157,6 +158,9 @@ The items marked **UNSAFE WITH PEOPLE NEARBY** are why the aisles are closed off
    - Behind and beside the robot nothing slows it down for a person. The lidar costmap treats people as obstacles to
      avoid, but it doesn't stop the robot for someone stepping in.
    - The robot doesn't reverse (DWA `min_vel_x: 0`), but it **turns in place** at up to 0.5 rad/s.
+   - Before 2026-10-23 the footprint was centred on the lidar, 0.18 m ahead of the turning centre, so the rear
+     0.18 m of the body wasn't collision-checked during turns. It's centred correctly now; rows recorded before
+     then (`git_rev` before that change) were driven with the old geometry.
    - Its 0.62 × 0.58 m body sweeps a circle of about 0.42 m radius, and the corners swing out to the sides and rear,
      where the camera is blind.
 2. **UNSAFE WITH PEOPLE NEARBY: large turns in place on arrival.**

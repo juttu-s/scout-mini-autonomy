@@ -6,7 +6,7 @@
 The robot must stand on the floor with open floor in front of the camera (at least ~1 m, nothing on it).
 Uses the detector's aligned depth (/camera/camera/aligned_depth_to_color, color optical frame). Fits the floor plane
 with RANSAC over 15 frames and prints cam_z / cam_pitch / cam_roll for scout_safety/robot.launch
-(base_link = the MID360, so cam_z = camera height above floor - lidar height). cam_x / cam_y / cam_yaw can't be seen
+(base_link = the turning centre, at lidar height, so cam_z = camera height above floor - lidar height). cam_x / cam_y / cam_yaw can't be seen
 from the floor: measure x and y with a tape (camera centre relative to the lidar centre, x forward, y left).
 """
 import argparse
