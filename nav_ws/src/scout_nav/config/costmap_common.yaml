@@ -35,8 +35,11 @@ obstacle_layer:
     marking: true
     clearing: true
     expected_update_rate: 0.5
-    obstacle_range: 3.0
-    raytrace_range: 3.5
+    # 2.0 m: beyond ~2.5 m the floor reads 0.06-0.08 m high (camera pitch slightly off) and noise crossed the marking
+    # height; those marks are never cleared (later rays to the floor pass below them) and blocked DWA's local goal:
+    # every trajectory "unreachable", the robot wouldn't move (lab2 C -> D, 2026-10-23, bag ~/bags/diag/dwa_*234541)
+    obstacle_range: 2.0
+    raytrace_range: 2.5
     inf_is_valid: false
 
 inflation_layer:

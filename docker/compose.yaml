@@ -74,7 +74,8 @@ services:
       dockerfile: docker/base/Dockerfile
     command: ["roslaunch", "--wait", "/opt/scout/launch/base.launch",
               "nav:=${SCOUT_NAV:-false}", "map:=${SCOUT_MAP:-}",
-              "init_x:=${SCOUT_INIT_X:-0.0}", "init_y:=${SCOUT_INIT_Y:-0.0}", "init_yaw:=${SCOUT_INIT_YAW:-0.0}"]
+              "init_x:=${SCOUT_INIT_X:-0.0}", "init_y:=${SCOUT_INIT_Y:-0.0}", "init_yaw:=${SCOUT_INIT_YAW:-0.0}",
+              "dwa_debug:=${SCOUT_DWA_DEBUG:-false}"]
     restart: on-failure             # Docker backs off between restarts
     stop_grace_period: 120s       # may be closing a multi-GB rosbag (record_nav.sh / record_session.sh)
     environment:

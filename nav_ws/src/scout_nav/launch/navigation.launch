@@ -11,6 +11,7 @@
   <arg name="init_y"     default="0.0"/>
   <arg name="init_yaw"   default="0.0"/>
   <arg name="lidar_height" default="0.76"/>
+  <arg name="dwa_debug"  default="false"/>  <!-- true: DWA publishes its scored trajectories + cost grid (diagnosis; costs CPU) -->
   <arg name="global_localization" default="true"/>  <!-- enables rosservice call /relocalize -->  <!-- MID360 centre above the floor (measured) -->
 
   <include if="$(arg with_robot)" file="$(find scout_safety)/launch/robot.launch">
@@ -28,7 +29,7 @@
     <remap from="~input" to="/livox/lidar"/>
     <remap from="~output" to="/livox/lidar_filtered"/>
     <rosparam>
-      min_x: -0.4
+      min_x: -0.55   # the MID360 is 0.178 m ahead of the turning centre, so the body reaches 0.49 m behind it (+ margin)
       max_x: 0.4
       min_y: -0.4
       max_y: 0.4
@@ -70,6 +71,8 @@
     <rosparam file="$(find scout_nav)/config/local_costmap.yaml" command="load"/>
     <rosparam file="$(find scout_nav)/config/planners.yaml" command="load"/>
     <rosparam file="$(arg map_dir)/costmap_heights.yaml" command="load"/>
+    <param name="DWAPlannerROS/publish_traj_pc" value="$(arg dwa_debug)"/>
+    <param name="DWAPlannerROS/publish_cost_grid_pc" value="$(arg dwa_debug)"/>
     <remap from="cmd_vel" to="/nav/cmd_vel"/>
     <remap from="odom" to="/odom"/>   <!-- Scout wheel odometry: body-frame velocity for DWA -->
   </node>

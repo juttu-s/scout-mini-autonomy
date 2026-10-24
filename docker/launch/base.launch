@@ -9,6 +9,7 @@
   <arg name="init_x"   default="0.0"/>
   <arg name="init_y"   default="0.0"/>
   <arg name="init_yaw" default="0.0"/>
+  <arg name="dwa_debug" default="false"/>
 
   <include file="$(find scout_bringup)/launch/scout_robot_base.launch"/>
   <include file="$(find livox_ros_driver2)/launch_ROS1/msg_MID360.launch"/>
@@ -30,6 +31,7 @@
     <arg name="init_x"     value="$(arg init_x)"/>
     <arg name="init_y"     value="$(arg init_y)"/>
     <arg name="init_yaw"   value="$(arg init_yaw)"/>
+    <arg name="dwa_debug"  value="$(arg dwa_debug)"/>
   </include>
 
   <!-- container health signal: file age read by docker/common/healthcheck.sh -->
