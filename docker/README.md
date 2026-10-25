@@ -5,9 +5,9 @@ Four containers that talk over ROS 1, split by **failure domain** rather than on
 | container | image | runs | restart |
 |---|---|---|---|
 | `master` | scout-safety | `roscore` (rosmaster + rosout) | never: ROS 1 nodes don't re-register with a new master |
-| `safety` | scout-safety (ros-core + messages, no GPU) | `safety_node.py`, the only `/cmd_vel` publisher | unless-stopped |
-| `perception` | scout-perception (DeepStream 6.3 L4T + ROS + torch) | RealSense driver, camera mount TF, detector | unless-stopped |
-| `base` | scout-base (ros-base) | Scout base (CAN), MID360, DLIO, Foxglove; with `--nav` localization + move_base | unless-stopped |
+| `safety` | scout-safety (ros-core + messages, no GPU) | `safety_node.py`, the only `/cmd_vel` publisher | on failure |
+| `perception` | scout-perception (DeepStream 6.3 L4T + ROS + torch) | RealSense driver, camera mount TF, detector | on failure |
+| `base` | scout-base (ros-base) | Scout base (CAN), MID360, DLIO, Foxglove; with `--nav` localization + move_base | on failure |
 
 `robot.launch` and `navigation.launch` are unchanged, so the native stack still works as a fallback. The container
 launch files in `launch/` include the same pieces with the same defaults.
@@ -23,7 +23,38 @@ launch files in `launch/` include the same pieces with the same defaults.
                                   # (robot_exec.sh loads the ROS environment; plain `docker compose exec` doesn't)
 ~/robot_down.sh                   # closes any recording first, then stops perception, base, safety, master
 TAG=20261022-abc1234 ~/robot_up.sh    # roll back to an older build (docker images | grep scout-)
+~/ros_utils/docker/deploy.sh v0.2.0   # deploy a CI release instead of a local build (see "Release and deploy")
 ```
+`~/robot_{up,down,exec}.sh` are symlinks to `robot_*.sh` in this directory.
+
+## Release and deploy
+A `v*` tag is a release: CI (`.github/workflows/ci.yml`) runs every test and pushes the arm64 safety and base images
+to `ghcr.io/juttu-s/scout-{safety,base}:<tag>`. Perception needs JetPack and is never built in CI; a deploy keeps the
+perception image that is running (compose: `PERCEPTION_TAG`, default `TAG`).
+```
+git tag v0.2.0 && git push origin v0.2.0          # on any machine; wait for the CI "image" jobs
+docker login ghcr.io -u juttu-s                   # once on the robot; password: a token with read:packages
+~/can_up.sh
+~/ros_utils/docker/deploy.sh v0.2.0               # [--skip-scenarios] [--nav <map> [x y yaw]]
+```
+`deploy.sh` stops at the first failed gate, and only steps 6-7 touch the running stack:
+
+| step | what | on failure |
+|---|---|---|
+| 1 preflight | Docker, `can0`, clean checkout, the tag's commit, GHCR login | abort, nothing changed |
+| 2 verify | pulled images are arm64 and labelled with the tag's commit (`org.opencontainers.image.revision`) | abort |
+| 3 scenarios | the release's 15 safety scenarios in the release's safety image, on the Orin, on their own master (~2.5 min) | abort |
+| 4 stationary | no recording; `/odom` still; no teleop/nav source in the safety node; no move_base goal | abort (refuses) |
+| 5 rollback point | running images tagged `scout-{safety,base}:pre-<time>` (last 3 kept) | |
+| 6 apply | `robot_down.sh`, `robot_up.sh` on the tag; a running navigation stack restarts on its map at the current pose | roll back |
+| 7 smoke | rates: `/cmd_vel`, `/odom` >= 45 Hz, lidar >= 9, camera >= 25, detections >= 15; safety leaves FAULT; with nav, inlier fraction >= 0.9 | roll back |
+
+Rolling back restarts on `pre-<time>` and runs the smoke test again (exit 1; exit 2 if that fails too). The checks
+in steps 4 and 7 are `deploy_check.py`, piped into the running base container, so they work against any image,
+including the one rolled back to. The thresholds can be overridden (`SMOKE_MIN_CMD_HZ=500 deploy.sh ...` forces a
+rollback, for testing it). Logs: `~/.scout_deploy/deploy-<time>.log`, scenario results in
+`~/.scout_deploy/scenarios-<time>/`, one line per deploy in `~/.scout_deploy/history.csv`. Wheel motion is never
+part of the deploy; drive-test a release with `run_circuit.py`.
 
 ## Why these choices
 - **Host networking for all containers.** The MID360 sends UDP on the host's LAN, `can0` exists only in the host's

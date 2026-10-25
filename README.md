@@ -23,6 +23,8 @@ ROS Noetic stack for an AgileX Scout Mini on a Jetson AGX Orin, with a RealSense
   opens (or comments on) an issue with each failed assertion's measured value against its threshold; the bag and
   logs are attached to the run;
 - **images** (master, tags, weekly): `safety` and `base` built for arm64; `v*` tags push them to GHCR.
+- **deploy** (on the robot): `docker/deploy.sh <tag>` pulls a release, runs the safety scenarios on the Orin, refuses
+  unless the robot is idle, restarts the stack, smoke-tests it and rolls back on failure ([docker/README.md](docker/README.md#release-and-deploy)).
   Perception needs CUDA / TensorRT on JetPack and is built on the robot (`docker/build.sh perception`).
 
 Not tested in CI: anything that needs the robot, the sensors or the GPU.

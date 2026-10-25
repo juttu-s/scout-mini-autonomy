@@ -102,7 +102,7 @@ services:
 
   perception:
     <<: *ros
-    image: scout-perception:${TAG:-latest}
+    image: scout-perception:${PERCEPTION_TAG:-${TAG:-latest}}   # a CI release (deploy.sh) brings safety + base only
     build:
       context: ..
       dockerfile: docker/perception/Dockerfile
