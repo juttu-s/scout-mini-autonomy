@@ -18,7 +18,6 @@ import json
 import os
 import signal
 import subprocess
-import sys
 import time
 import xmlrpc.client
 

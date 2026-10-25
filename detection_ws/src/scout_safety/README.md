@@ -96,12 +96,18 @@ Bench test without the robot: `robot:=false` (camera + detector + safety only; v
 Check the mount: a person standing at a tape-measured 2.0 m in front of the bumper should show `nearest ≈ 2.0` in `/scout_safety/state`.
 
 ## Test procedure
-1. **Offline logic tests** (`test/scenario_test.py`, run steps in its docstring; 20/20 passing; run it on a separate master if the robot is up): synthetic detections, tracks and commands. Covered:
+1. **Offline logic tests** (`test/scenario_test.py`; 15 scenarios, each against a freshly started node with `config/safety.yaml`; CI runs each as its own job and opens an issue on failure). Run them in the safety image, which has its own master, so it's safe while the robot is up:
+   ```bash
+   docker run --rm --entrypoint bash -v ~/ros_utils/detection_ws/src/scout_safety/test:/test -v /tmp/out:/out \
+       scout-safety:latest /test/run_scenario.sh --all /out      # or <scenario id> instead of --all
+   ```
+   Each writes `result.json` (each assertion with measured value vs threshold), a bag and the node log. Synthetic detections, tracks and commands. Covered:
    - zones and speed scaling, turning while stopped, the reverse cap;
    - teleop overriding navigation, input timeout;
    - people without depth;
    - a TTC stop for someone running at the robot, but not for someone off to the side;
-   - STOP hold, no flicker for a person jumping in and out of the corridor, stalled detector → FAULT, rogue `/cmd_vel` publisher reported.
+   - STOP hold, no flicker for a person jumping in and out of the corridor, rogue `/cmd_vel` publisher reported;
+   - detector stops publishing mid-run: FAULT within `max_detection_age` + 2 cycles (0.39 s; 0.31–0.32 s measured), every `/cmd_vel` exactly zero while teleop keeps commanding, then OK only after `recover_time`.
 2. **Robot on a stand, wheels off the ground:** drive with teleop, then:
    - walk toward the camera and check the OK → SLOW → STOP transitions;
    - kill the detector: the wheels must stop within ~0.3 s;

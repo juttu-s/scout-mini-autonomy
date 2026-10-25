@@ -4,6 +4,9 @@
 !/.gitignore
 !/setup.bash
 !/setup.md
+!/README.md
+!/ruff.toml
+!/.github/
 !/docker/
 !/detection_ws/
 /detection_ws/*
@@ -23,6 +26,7 @@
 !/slam_eval_ws/src/slam_eval/
 # never
 __pycache__/
+.pytest_cache/
 *.pyc
 /detection_ws/src/rs_object_detection/models/*.engine
 /detection_ws/src/rs_object_detection/models/*.pt

@@ -78,7 +78,7 @@ def endpoint(t):
 
 def ref_at(ref, stamps, max_gap):
     """Reference poses interpolated at `stamps` (position linear, rotation slerp) where the reference has poses at
-    most `max_gap` s apart on both sides. A loop-closed reference has one pose per keyframe (LIO-SAM: ~1 m apart),
+    most `max_gap` s apart on both sides (None if there are none). A loop-closed reference has one pose per keyframe (LIO-SAM: ~1 m apart),
     so nearest-stamp association alone matched only a handful of another method's poses."""
     t = ref.timestamps
     i = np.searchsorted(t, stamps)
@@ -87,6 +87,8 @@ def ref_at(ref, stamps, max_gap):
     exact = np.isin(stamps, t)
     ok |= exact
     s = stamps[ok]
+    if not len(s):  # no overlap at all (Slerp can't evaluate an empty set)
+        return None, ok
     pos = np.stack([np.interp(s, t, ref.positions_xyz[:, k]) for k in range(3)], 1)
     rot = Slerp(t, Rotation.from_quat(ref.orientations_quat_wxyz[:, [1, 2, 3, 0]]))(s).as_quat()[:, [3, 0, 1, 2]]
     return PoseTrajectory3D(positions_xyz=pos, orientations_quat_wxyz=rot, timestamps=s), ok
@@ -95,7 +97,7 @@ def ref_at(ref, stamps, max_gap):
 def agreement(ref, est, a):
     """(APE rmse m, RPE rmse m per delta, full est aligned to ref) or Nones when they don't overlap."""
     r, ok = ref_at(ref, est.timestamps, a.max_gap)
-    if r.num_poses < 10:
+    if r is None or r.num_poses < 10:
         return None, None, None
     e = PoseTrajectory3D(positions_xyz=est.positions_xyz[ok], orientations_quat_wxyz=est.orientations_quat_wxyz[ok],
                          timestamps=est.timestamps[ok])

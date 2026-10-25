@@ -1,0 +1,239 @@
+# CI for the Scout Mini stack: lint, catkin build + unit tests, the scout_safety scenarios (one job per scenario,
+# against the real safety image), and arm64 image builds for the robot. Perception (CUDA / TensorRT / DeepStream on
+# JetPack) can't be built on GitHub-hosted runners and stays a local build (docker/build.sh perception).
+name: CI
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * 1"   # weekly: catches upstream drift (a pinned commit or base image disappearing)
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: ruff (errors only, see ruff.toml)
+        run: git ls-files -z '*.py' | xargs -0 pipx run --spec ruff==0.6.9 ruff check
+      - name: shellcheck
+        run: git ls-files '*.sh' | xargs shellcheck -S error
+      - name: XML and YAML parse
+        run: |
+          sudo apt-get install -y -qq python3-yaml >/dev/null
+          python3 - <<'EOF'
+          import subprocess, sys, xml.etree.ElementTree as ET, yaml
+          files = subprocess.run(["git", "ls-files", "*.xml", "*.launch", "*.yaml", "*.yml"], capture_output=True,
+                                 text=True, check=True).stdout.split()
+          bad = 0
+          for f in files:
+              if open(f).readline().startswith("%YAML:"):
+                  continue  # OpenCV FileStorage (DeepStream tracker config), not YAML
+              try:
+                  ET.parse(f) if f.endswith((".xml", ".launch")) else list(yaml.safe_load_all(open(f)))
+              except Exception as e:
+                  bad += 1
+                  print("::error file=%s::%s" % (f, e))
+          print("%d files checked, %d bad" % (len(files), bad))
+          sys.exit(bad > 0)
+          EOF
+
+  build-test:
+    name: catkin build + nav unit tests
+    runs-on: ubuntu-latest
+    container: ros:noetic-ros-base-focal
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Tools
+        run: apt-get update && apt-get install -y --no-install-recommends git python3-yaml python3-pytest
+      - uses: actions/checkout@v4
+      - name: Workspace (vision_msgs at the same pin as the images)
+        run: |
+          mkdir -p /ws/src
+          python3 docker/common/fetch_third_party.py docker/pins /ws/src vision_msgs
+          for p in detection_ws/src/rs_object_detection detection_ws/src/scout_safety nav_ws/src/scout_nav \
+                   slam_eval_ws/src/slam_eval; do ln -s "$PWD/$p" /ws/src/; done
+      - name: catkin_make
+        run: source /opt/ros/noetic/setup.bash && cd /ws && catkin_make -DCMAKE_BUILD_TYPE=Release
+      - name: Message import check
+        run: |
+          source /ws/devel/setup.bash
+          python3 -c "from rs_object_detection.msg import TrackedObjectArray; from vision_msgs.msg import Detection3DArray"
+      - name: pytest (scout_nav)
+        run: source /ws/devel/setup.bash && python3 -m pytest -v nav_ws/src/scout_nav/test
+
+  slam-eval-test:
+    name: slam_eval unit tests
+    runs-on: ubuntu-latest
+    container: python:3.8-slim   # the slam_eval venv's Python and package versions
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install -q -r slam_eval_ws/src/slam_eval/requirements.txt pytest
+      - run: python -m pytest -v slam_eval_ws/src/slam_eval/test
+
+  safety-image-amd64:
+    name: safety image (amd64, for the scenarios)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/safety/Dockerfile
+          platforms: linux/amd64
+          tags: scout-safety:ci
+          outputs: type=docker,dest=/tmp/scout-safety.tar
+          cache-from: type=gha,scope=safety-amd64
+          cache-to: type=gha,scope=safety-amd64,mode=max
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scout-safety-image
+          path: /tmp/scout-safety.tar
+          retention-days: 1
+
+  scenario-list:
+    runs-on: ubuntu-latest
+    outputs:
+      ids: ${{ steps.list.outputs.ids }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: list
+        run: echo "ids=$(python3 detection_ws/src/scout_safety/test/scenario_test.py --list)" >> "$GITHUB_OUTPUT"
+
+  scenario:
+    name: "scenario: ${{ matrix.id }}"
+    needs: [safety-image-amd64, scenario-list]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    strategy:
+      fail-fast: false
+      matrix:
+        id: ${{ fromJSON(needs.scenario-list.outputs.ids) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: scout-safety-image
+          path: /tmp
+      - run: docker load -i /tmp/scout-safety.tar
+      - name: Run ${{ matrix.id }}
+        run: |
+          mkdir -p out
+          docker run --rm --entrypoint bash --user "$(id -u):$(id -g)" \
+            -v "$PWD/detection_ws/src/scout_safety/test:/test:ro" -v "$PWD/out:/out" \
+            scout-safety:ci /test/run_scenario.sh "${{ matrix.id }}" /out
+      - name: Upload result, bag and logs
+        id: upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scenario-${{ matrix.id }}
+          path: out/
+          if-no-files-found: warn
+      - name: Open or update an issue
+        if: failure() && github.event_name != 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          SCENARIO: ${{ matrix.id }}
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        with:
+          script: |
+            const fs = require('fs');
+            const id = process.env.SCENARIO;
+            let r = null;
+            try { r = JSON.parse(fs.readFileSync('out/result.json', 'utf8')); } catch (e) {}
+            const fmt = v => (typeof v === 'number' || typeof v === 'string' ? String(v) : JSON.stringify(v));
+            const sha = context.sha.slice(0, 7);
+            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const prefix = `[safety-scenario] ${id}:`;
+            const title = `${prefix} ${r ? r.name : 'no result (crashed or timed out)'}`;
+            let body = `**Scenario** \`${id}\` failed on [\`${sha}\`](${context.serverUrl}/${context.repo.owner}/` +
+                       `${context.repo.repo}/commit/${context.sha}) (${context.eventName}, \`${context.ref}\`).\n\n` +
+                       `Run: ${run}\nArtifacts (bag, logs, result.json): ${process.env.ARTIFACT_URL || run}\n\n`;
+            if (!r) {
+              body += 'No result.json: the test crashed or timed out before writing it. See the run log.\n';
+            } else {
+              const failed = r.assertions.filter(a => !a.passed);
+              if (failed.length) {
+                body += '| phase | assertion | measured | expected | tolerance / threshold |\n|---|---|---|---|---|\n';
+                for (const a of failed) {
+                  const lim = a.tolerance !== undefined ? `± ${a.tolerance}` :
+                              a.threshold !== undefined ? fmt(a.threshold) : '';
+                  body += `| ${a.phase} | ${a.what} | ${fmt(a.measured)} | ${fmt(a.expected)} | ${lim} |\n`;
+                }
+              }
+              if (r.error) body += '\n```\n' + r.error.slice(-3000) + '\n```\n';
+              body += '\n<details><summary>safety node parameters</summary>\n\n```json\n' +
+                      JSON.stringify(r.params, null, 2) + '\n```\n</details>\n';
+            }
+            const label = 'ci-scenario';
+            try { await github.rest.issues.getLabel({...context.repo, name: label}); }
+            catch (e) { await github.rest.issues.createLabel({...context.repo, name: label, color: 'b60205'}); }
+            const open = await github.paginate(github.rest.issues.listForRepo, {...context.repo, state: 'open',
+                                                                                 per_page: 100});
+            const existing = open.find(i => !i.pull_request && i.title.startsWith(prefix));
+            if (existing) {
+              await github.rest.issues.createComment({...context.repo, issue_number: existing.number,
+                                                      body: 'Failed again.\n\n' + body});
+              core.notice(`commented on #${existing.number}`);
+            } else {
+              const i = await github.rest.issues.create({...context.repo, title, body, labels: [label]});
+              core.notice(`opened #${i.data.number}`);
+            }
+
+  images:
+    name: "image: ${{ matrix.svc }} (arm64)"
+    # base takes 30-60 min on a cold cache: only on master, tags, the weekly run and by hand
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        svc: [safety, base]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Image name (GHCR needs lowercase)
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/scout-${{ matrix.svc }}" >> "$GITHUB_ENV"
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=ref,event=tag
+            type=sha
+      - uses: docker/setup-buildx-action@v3
+      - if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/${{ matrix.svc }}/Dockerfile
+          platforms: linux/arm64
+          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.svc }}-arm64
+          cache-to: type=gha,scope=${{ matrix.svc }}-arm64,mode=max
