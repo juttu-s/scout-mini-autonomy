@@ -1,6 +1,6 @@
 # Scout Mini: perception, safety and navigation
 
-[![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
+[![CI](https://github.com/juttu-s/scout-mini-autonomy/actions/workflows/ci.yml/badge.svg)](https://github.com/juttu-s/scout-mini-autonomy/actions/workflows/ci.yml)
 
 ROS Noetic stack for an AgileX Scout Mini on a Jetson AGX Orin, with a RealSense D455 and a Livox MID360:
 
