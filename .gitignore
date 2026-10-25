@@ -32,3 +32,6 @@ __pycache__/
 /detection_ws/src/rs_object_detection/models/*.pt
 /detection_ws/src/rs_object_detection/models/*.onnx
 /detection_ws/src/rs_object_detection/models/*.so
+# private notes, kept on the robot only
+/detection_ws/src/rs_object_detection/PROJECT_LOG.md
+/detection_ws/src/rs_object_detection/FAILURES.md

@@ -42,7 +42,7 @@ TAG=20261022-abc1234 ~/robot_up.sh    # roll back to an older build (docker imag
 - **perception mounts all of `/dev`.** The D455 re-enumerates its USB device on `initial_reset`, so a fixed device
   path breaks. Access is still limited: the device cgroup only admits USB (major 189) and V4L (major 81) character
   devices, the udev rules stay on the host, and it's narrower than `--privileged`. The D455 IMU (HID/IIO) is not
-  admitted; it's off by default anyway (FAILURES.md F-50: it stalls the camera).
+  admitted; it's off by default anyway (it stalls the camera).
 - **Bags go to `~/bags`, a bind mount** (`BAG_ROOT`), never into a container layer. `record_session.sh` symlinks
   `~/maps/<name>/recording` to the bag folder, so the offline tools still find them.
 - **Image sizes.** scout-safety is about 2.1 GB, almost all of it the official `ros:noetic-ros-core` layers: ROS 1's
@@ -120,7 +120,7 @@ message − the scan's arrival; CPU from `/proc`, which sees the containers' pro
   against the 100 ms scan period.
 - **The camera driver uses less than half the CPU in the container.** Natively, realsense-ros loads ROS's apt
   `librealsense2` 2.50 (libusb/RSUSB backend). The image builds 2.57 from source with CUDA and the kernel backend,
-  which is what `~/ros_utils/librealsense` was built for. That's also the fix PROJECT_LOG §14 lists for the D455
+  which is what `~/ros_utils/librealsense` was built for. That's also the likely fix for the D455
   IMU stall, so `camera_imu:=true` is worth retrying in the container.
 - **Health checks** cost 4.5 ms per check, every 5 s, per container: about 0.1 % of a core in total.
 

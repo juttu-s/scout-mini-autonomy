@@ -33,7 +33,7 @@ Measured numbers are from the Jetson AGX Orin (JetPack 5.1.x, ROS Noetic) unless
   - a min-pool fills the small holes.
 - **Rejected:**
   - the driver's `align_depth:=true`: realsense-ros links ROS's librealsense 2.50, which aligns on the CPU. Aligned depth came at ~5 Hz and colour arrived in bursts with ~190 ms latency;
-  - rebuilding realsense-ros against the CUDA librealsense 2.57 in `/usr/local`: real risk that the ROS1 wrapper doesn't build, and the GPU path was fast enough. It's still the "proper" fix for the D455 IMU (§14).
+  - rebuilding realsense-ros against the CUDA librealsense 2.57 in `/usr/local`: real risk that the ROS1 wrapper doesn't build, and the GPU path was fast enough. It's still the "proper" fix for the D455 IMU stall.
 - **Validated** against the driver's own aligned image on the same frame: median difference 5 mm, p95 28 mm.
 - **Distance per box** = median of valid depth in the **central 50 %** of the box. This keeps background at the edges out. Size comes from the 10th–90th percentile spread.
 - **Large boxes are grid-sampled** (~4,000 pixels) for these statistics: 4.5 → 0.4 ms per box, and on 584 identical boxes the result differed by median 0.1 mm.

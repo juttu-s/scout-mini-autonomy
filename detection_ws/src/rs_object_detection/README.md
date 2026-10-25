@@ -62,7 +62,7 @@ Tuning: `velocity_*`, `track_history` and `track_timeout` in `config/detector.ya
 ByteTrack only matches by predicted position, so turning the camera away and back used to give a person a new id.
 New person tracks are now shown as `#?` while their appearance (a `yolo26n-reid` TensorRT embedding) is compared with people who are not currently visible. A match (cosine ≥ 0.6) gets the old id back; people are remembered for 300 s.
 The tracker is also class-gated (`gate_classes: [0]` in `config/tracker.yaml`), so a person's track can't jump onto another object.
-Build the engine once: see `PROJECT_LOG.md` section 9. Settings: `reid_*` in `config/detector.yaml`. Disable with `reid_model:=""`.
+Build the engine once on the Orin (TensorRT). Settings: `reid_*` in `config/detector.yaml`. Disable with `reid_model:=""`.
 Detections without enough valid depth appear only in `detections_2d`.
 
 ## Re-export the TensorRT engine
@@ -98,4 +98,4 @@ Files:
 - in `models/` (gitignored): `yolo11s_ds.onnx` (DeepStream-Yolo export, *not* the ultralytics ONNX), its cached engine `yolo11s_ds_b1_gpu0_fp16.engine`, `coco_labels.txt`, `libnvdsinfer_custom_impl_Yolo.so`.
 
 The launch file sets `LD_PRELOAD=/lib/aarch64-linux-gnu/libgomp.so.1` for this backend (the tracker library won't load after torch without it).
-Recreating the assets is covered in `~/projects/rs_detection/deepstream/README.md`; the evaluation is in `PROJECT_LOG.md` section 11.
+Recreating the assets is covered in `~/projects/rs_detection/deepstream/README.md`.
